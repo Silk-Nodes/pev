@@ -41,10 +41,17 @@ export const themeA = {
   laneAlt: "rgba(240,230,210,0.02)",
   text: "#efe7d4",
   muted: "#8a8577",
-  // Bumped from #5c5749 to #827b6c for WCAG AA contrast on dark ink.
-  // Kept in sync with --pev-subtle in globals.css. Still reads quieter
-  // than muted (#8a8577) so the text > muted > subtle hierarchy holds.
-  subtle: "#827b6c",
+  // Collapsed to the same value as muted (#8a8577) after the previous
+  // #827b6c value still failed WCAG AA on our lightest dark surfaces:
+  //   • on panel  (#141310): #827b6c was ~4.44:1 (fail, AA needs 4.5)
+  //   • on surface03 (#1a1813): #827b6c was ~4.23:1 (worse fail)
+  // #8a8577 on those surfaces is ~5.06:1 and ~4.82:1 respectively, so
+  // every legacy `subtle` site now passes AA without a search-and-replace.
+  // The token name survives because callers still semantically distinguish
+  // "subtle decorative numbering" from "muted body text"; the visual
+  // quietness is now communicated via smaller font-size + the mono family
+  // (e.g. the 11px mono step numbers in the docs TOC) rather than by hue.
+  subtle: "#8a8577",
   dim: "#2a2822",
   accent: "#e28c52",
   onAccent: "#1a0f08",
@@ -62,6 +69,16 @@ export const themeA = {
     delayed: "#d4a94a",
     /** has outbound conflicts, this tx blocked others */
     source: "#c8553d",
+    /**
+     * Inline-text variant of `source`. The brand terracotta `#c8553d`
+     * is ~4.28:1 on the panel surface, which fails WCAG AA for normal
+     * text. This lighter shade (~5.59:1 on panel, ~5.32:1 on surface03)
+     * preserves the warm-warning hue for inline emphasis like "hot
+     * shared state" or conflict counts inside paragraphs, while the
+     * darker `source` stays in use for filled chips, borders, and the
+     * conflict-stripe pattern where surface fills cover their own text.
+     */
+    sourceText: "#d96e51",
   },
   mono: 'var(--font-pev-mono), "JetBrains Mono", ui-monospace, monospace',
   sans: 'var(--font-pev-sans), "Inter Tight", -apple-system, system-ui, sans-serif',

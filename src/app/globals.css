@@ -38,12 +38,13 @@
   --pev-alt-bg:     var(--pev-surface-03);
   --pev-text:       var(--pev-bone);
   --pev-muted:      var(--pev-stone);
-  /* Bumped from #5c5749 (2.67:1 on ink, fails WCAG AA) to #827b6c
-     (~4.63:1, passes AA for normal text). Still reads quieter than
-     --pev-muted (#8a8577 ≈ 5.56:1) so the visual hierarchy of
-     text > muted > subtle stays intact, just every tier is now
-     readable per accessibility standards. */
-  --pev-subtle:     #827b6c;
+  /* Collapsed onto --pev-muted (#8a8577). The previous #827b6c value
+     measured ~4.44:1 on panel and ~4.23:1 on surface03, both below the
+     4.5:1 AA threshold. Quietness is now expressed through smaller
+     font-size and the mono family (see .pev-eyebrow, the docs TOC
+     step numbers), not through hue. Kept in sync with themeA.subtle
+     in components/parallel/theme.ts. */
+  --pev-subtle:     var(--pev-stone);
   --pev-dim:        #2a2822;
   --pev-accent:     var(--pev-ember);
   --pev-on-accent:  #1a0f08;

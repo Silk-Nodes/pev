@@ -327,7 +327,9 @@ export default async function ContractPage({ params, searchParams }: PageParams)
       ? themeA.status.clean
       : contract.avgParallelismScore >= 40
         ? themeA.status.delayed
-        : themeA.status.source;
+        // sourceText (lighter terracotta) for AA contrast when this
+        // computed color is consumed as text downstream.
+        : themeA.status.sourceText;
 
   const verdict = computeVerdict(contract, methodNames);
 
@@ -426,7 +428,7 @@ export default async function ContractPage({ params, searchParams }: PageParams)
         <Stat
           label="Conflicts caused"
           value={contract.conflictsCaused.toLocaleString()}
-          color={contract.conflictsCaused > 0 ? themeA.status.source : themeA.text}
+          color={contract.conflictsCaused > 0 ? themeA.status.sourceText : themeA.text}
         />
       </section>
 
@@ -526,7 +528,7 @@ export default async function ContractPage({ params, searchParams }: PageParams)
                   <span style={{ textAlign: "right", color: themeA.muted, whiteSpace: "nowrap" }}>
                     <span style={{ color: themeA.text }}>{s.appearances}</span> blocks ·{" "}
                     <span style={{ color: themeA.text }}>{s.totalTouches}</span> touches ·{" "}
-                    <span style={{ color: s.totalConflicts > 0 ? themeA.status.source : themeA.subtle }}>
+                    <span style={{ color: s.totalConflicts > 0 ? themeA.status.sourceText : themeA.subtle }}>
                       {s.totalConflicts} conf
                     </span>
                   </span>
@@ -544,7 +546,9 @@ export default async function ContractPage({ params, searchParams }: PageParams)
                   ? themeA.status.clean
                   : b.parallelismScore >= 40
                     ? themeA.status.delayed
-                    : themeA.status.source;
+                    // sourceText: consumed as a text color in the
+                    // adjacent score number, not a fill.
+                    : themeA.status.sourceText;
               return (
                 <Link
                   key={b.number}
@@ -849,7 +853,7 @@ function WorstBlockCallout({
               style={{
                 fontFamily: themeA.mono,
                 fontSize: 18,
-                color: themeA.status.source,
+                color: themeA.status.sourceText,
               }}
             >
               {worst.parallelismScore}/100
@@ -1136,7 +1140,8 @@ function computeVerdict(
   const methodPart = topMethodLabel ? ` Worst method: ${topMethodLabel}.` : "";
   return {
     tier: "killer",
-    color: themeA.status.source,
+    // sourceText: this color renders as the verdict label text.
+    color: themeA.status.sourceText,
     label: "Throughput-killer",
     message: `${slotPart}${methodPart}`.trim(),
   };
@@ -1218,8 +1223,13 @@ function MethodList({
         const argsTail = resolved ? sig.slice(name.length) : null;
         const pct =
           totalConflicts > 0 ? (m.conflictsCaused / totalConflicts) * 100 : 0;
+        // conflictColor renders as inline text on the methods table
+        // (the count next to each function). sourceText gives the AA
+        // contrast that source can't on dark surfaces. The bar fill
+        // below stays on the saturated `source` because it's a
+        // background, not text.
         const conflictColor =
-          m.conflictsCaused > 0 ? themeA.status.source : themeA.subtle;
+          m.conflictsCaused > 0 ? themeA.status.sourceText : themeA.subtle;
         return (
           <div
             key={m.selector}

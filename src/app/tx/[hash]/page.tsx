@@ -92,7 +92,7 @@ export default async function TxPage({ params }: PageParams) {
 
   const statusBadge =
     tx.status === "source"
-      ? { label: `Blocks ${tx.outboundConflicts} later tx${tx.outboundConflicts === 1 ? "" : "s"}`, color: themeA.status.source }
+      ? { label: `Blocks ${tx.outboundConflicts} later tx${tx.outboundConflicts === 1 ? "" : "s"}`, color: themeA.status.sourceText }
       : tx.status === "delayed"
         ? { label: `Delayed · waits on wave ${tx.wave}`, color: themeA.status.delayed }
         : { label: "Parallel · executed independently", color: themeA.status.clean };

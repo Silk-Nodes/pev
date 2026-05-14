@@ -242,7 +242,7 @@ export default async function PEVLanding({
                 color: themeA.text,
               }}
             >
-              <span style={{ color: themeA.status.source }}>Couldn't parse</span>{" "}
+              <span style={{ color: themeA.status.sourceText }}>Couldn't parse</span>{" "}
               <span style={{ color: themeA.muted }}>"{queryError}"</span>
               <span style={{ color: themeA.subtle }}>
                 {" "}, try a block number, a contract address (0x + 40 hex), or a tx hash (0x + 64 hex).
@@ -320,7 +320,7 @@ export default async function PEVLanding({
                     </span>
                     <span
                       style={{
-                        color: themeA.status.source,
+                        color: themeA.status.sourceText,
                         fontFamily: themeA.mono,
                         whiteSpace: "nowrap",
                       }}
@@ -489,7 +489,7 @@ export default async function PEVLanding({
             <span style={{ color: themeA.status.clean }}>isolated state</span>{" "}
             (per-user balances, sharded counters) parallelize cleanly;
             contracts with{" "}
-            <span style={{ color: themeA.status.source }}>hot shared state</span>{" "}
+            <span style={{ color: themeA.status.sourceText }}>hot shared state</span>{" "}
             (a single global counter, a shared queue) become the chokepoint{" "}
             <em
               style={{
@@ -641,7 +641,10 @@ function Verdict({
   //  a typical 30-tx Monad block; below that it's noise.)
   const isKiller = conflictCount >= 3;
   const verb = isKiller ? "Throughput-killer" : "Bottleneck";
-  const color = isKiller ? themeA.status.source : themeA.status.delayed;
+  // sourceText (lighter terracotta) instead of source: this color flows
+  // directly into the verdict label's text style (17px italic), so the
+  // brighter inline-text variant is needed for WCAG AA.
+  const color = isKiller ? themeA.status.sourceText : themeA.status.delayed;
   const contractLabel =
     bottleneck.contractName ?? shortHex(bottleneck.topContract, 6, 4);
 

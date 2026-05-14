@@ -277,7 +277,7 @@ export default function DocsPage() {
         <span style={{ color: themeA.status.clean }}>isolated state</span>{" "}
         (per-user balances, sharded counters) parallelize cleanly.
         Contracts with{" "}
-        <span style={{ color: themeA.status.source }}>hot shared state</span>{" "}
+        <span style={{ color: themeA.status.sourceText }}>hot shared state</span>{" "}
         (a single global counter, a shared queue, a contended AMM pool)
         become the chokepoint everyone else waits on.
       </P>
