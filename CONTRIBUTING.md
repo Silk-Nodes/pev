@@ -118,4 +118,12 @@ By contributing, you agree that your contributions will be licensed under the [M
 
 ---
 
+## For maintainers
+
+Cutting a release? See [`deploy/RELEASING.md`](./deploy/RELEASING.md) for the step-by-step flow (changelog update, version bump, tag, GitHub Release, deploy). The canonical changelog is at [`CHANGELOG.md`](./CHANGELOG.md), in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+
+Every PR worth surfacing in the next release should add a bullet under the `[Unreleased]` section of `CHANGELOG.md`. The release flow then moves those bullets into a dated version section.
+
+---
+
 Thanks again. Looking forward to your PR.
