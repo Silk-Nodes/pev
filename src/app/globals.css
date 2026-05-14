@@ -1,0 +1,132 @@
+/*
+ * pev — global styles. Tokens per PEV Brand Book v1.0 (Ch. 04 · Color).
+ * Single-purpose app; styles apply globally without a wrapper class.
+ */
+
+:root {
+  /* ─── Brand Book primary palette ─────────────────────────────── */
+  --pev-ink:        #0e0d0b;  /* base background */
+  --pev-cream:      #f6f0e1;  /* light surface (used on cream-bg pages) */
+  --pev-bone:       #efe7d4;  /* primary text on dark */
+  --pev-ember:      #e28c52;  /* the warm accent */
+  --pev-stone:      #8a8577;  /* muted text */
+
+  /* ─── Status palette (semantic) ──────────────────────────────── */
+  --pev-sage:       #a8c487;  /* clean parallel */
+  --pev-amber:      #d4a94a;  /* delayed (rescheduled) */
+  --pev-terracotta: #c8553d;  /* conflict source / re-execution */
+
+  /* ─── Surface scale (00 = deepest, 05 = highest) ─────────────── */
+  --pev-surface-00: #0a0907;
+  --pev-surface-01: #0e0d0b;
+  --pev-surface-02: #141310;
+  --pev-surface-03: #1a1813;
+  --pev-surface-04: #211e17;
+  --pev-surface-05: #2a261d;
+
+  /* ─── Lines & faint backgrounds ──────────────────────────────── */
+  --pev-line:       rgba(240, 230, 210, 0.09);
+  --pev-line-strong:rgba(240, 230, 210, 0.15);
+  --pev-grid-faint: rgba(240, 230, 210, 0.04);
+  --pev-lane-alt:   rgba(240, 230, 210, 0.02);
+  --pev-hint-bg:    rgba(226, 140, 82, 0.08);
+
+  /* ─── Aliases used throughout the components ─────────────────── */
+  --pev-bg:         var(--pev-ink);
+  --pev-panel:      var(--pev-surface-02);
+  --pev-card-bg:    #17150f;
+  --pev-alt-bg:     var(--pev-surface-03);
+  --pev-text:       var(--pev-bone);
+  --pev-muted:      var(--pev-stone);
+  --pev-subtle:     #5c5749;
+  --pev-dim:        #2a2822;
+  --pev-accent:     var(--pev-ember);
+  --pev-on-accent:  #1a0f08;
+  --pev-btn-bg:     rgba(240, 230, 210, 0.04);
+  --pev-tooltip-bg: #1a1814;
+  --pev-on-block:   #0a0908;
+  --pev-block-border: rgba(0, 0, 0, 0.35);
+  --pev-graph-bg:   #111009;
+  --pev-reexec-stripe: rgba(10, 8, 6, 0.55);
+  --pev-border:     var(--pev-line);
+  --pev-status-clean:   var(--pev-sage);
+  --pev-status-delayed: var(--pev-amber);
+  --pev-status-source:  var(--pev-terracotta);
+
+  /* ─── Three-voice typography (per Brand Book, Ch. 05) ────────── */
+  --pev-font-sans:  var(--font-pev-sans), "Inter Tight", -apple-system,
+                    BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --pev-font-serif: var(--font-pev-serif), "Instrument Serif",
+                    "Cormorant Garamond", Georgia, serif;
+  --pev-font-mono:  var(--font-pev-mono), "JetBrains Mono", "Fira Code",
+                    ui-monospace, SFMono-Regular, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  background: var(--pev-bg);
+  color: var(--pev-text);
+  min-height: 100vh;
+}
+
+body {
+  font-family: var(--pev-font-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle bone scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(240, 230, 210, 0.12);
+  border-radius: 3px;
+}
+
+/* ─── Editorial primitives reused by components ───────────────── */
+
+.pev-eyebrow {
+  font-family: var(--pev-font-mono);
+  font-size: 10px;
+  color: var(--pev-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+}
+
+.pev-display-italic {
+  font-family: var(--pev-font-serif);
+  font-style: italic;
+  color: var(--pev-text);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.pev-link {
+  color: #c8a47a;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.pev-link:hover { color: var(--pev-accent); }
+
+.pev-mono { font-family: var(--pev-font-mono); }
+
+/* Stripe pattern — used to mark conflict-source txs */
+.pev-stripe-source {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--pev-status-source),
+    var(--pev-status-source) 4px,
+    var(--pev-reexec-stripe) 4px,
+    var(--pev-reexec-stripe) 8px
+  );
+}
+
+/* Brand Book hero — warm radial glow at top-right of the cover page */
+.pev-cover-glow {
+  background:
+    radial-gradient(ellipse at 70% 30%, rgba(226, 140, 82, 0.12), transparent 60%),
+    var(--pev-ink);
+}

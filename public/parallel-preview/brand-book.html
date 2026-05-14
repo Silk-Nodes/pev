@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>PEV — Brand Book</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #0e0d0b;
+      --panel:    #141310;
+      --panel-2:  #1a1813;
+      --line:     rgba(240,230,210,0.09);
+      --line-2:   rgba(240,230,210,0.15);
+      --text:     #efe7d4;
+      --muted:    #8a8577;
+      --subtle:   #5c5749;
+      --ember:    #e28c52;
+      --sage:     #a8c487;
+      --amber:    #d4a94a;
+      --terra:    #c8553d;
+      --cream:    #f6f0e1;
+      --sans:     "Inter Tight", -apple-system, system-ui, sans-serif;
+      --serif:    "Instrument Serif", Georgia, serif;
+      --mono:     "JetBrains Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    body { overflow: hidden; }
+    button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    a { color: inherit; text-decoration: none; }
+
+    /* Layout */
+    .app { display: grid; grid-template-columns: 232px 1fr; height: 100vh; }
+    aside.rail {
+      border-right: 1px solid var(--line);
+      padding: 28px 20px;
+      display: flex; flex-direction: column; gap: 28px;
+      background: #0a0907;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .brand-mark {
+      width: 28px; height: 28px;
+    }
+    .brand-name {
+      font-family: var(--serif); font-style: italic; font-size: 22px;
+      letter-spacing: -.01em;
+    }
+    .brand-sub {
+      font-family: var(--mono); font-size: 10px; color: var(--subtle);
+      letter-spacing: .18em; text-transform: uppercase; margin-top: 14px;
+    }
+    nav ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 2px; }
+    nav li button {
+      width: 100%; text-align: left;
+      padding: 8px 10px; border-radius: 3px;
+      display: flex; gap: 12px; align-items: center;
+      font-size: 13px; color: var(--muted);
+      transition: background .12s, color .12s;
+    }
+    nav li button .num {
+      font-family: var(--mono); font-size: 10px; color: var(--subtle); width: 22px;
+    }
+    nav li button:hover { color: var(--text); background: rgba(240,230,210,.03); }
+    nav li button.active { color: var(--text); background: rgba(226,140,82,.08); }
+    nav li button.active .num { color: var(--ember); }
+
+    .colophon {
+      margin-top: auto;
+      font-family: var(--mono); font-size: 10px; color: var(--subtle);
+      line-height: 1.6;
+    }
+    .colophon .v { color: var(--text); }
+
+    /* Content area */
+    main {
+      overflow-y: auto; overflow-x: hidden;
+    }
+    main::-webkit-scrollbar { width: 8px; }
+    main::-webkit-scrollbar-track { background: transparent; }
+    main::-webkit-scrollbar-thumb { background: rgba(240,230,210,.1); border-radius: 4px; }
+
+    section.page {
+      min-height: 100vh;
+      padding: 72px clamp(40px, 6vw, 96px);
+      border-bottom: 1px solid var(--line);
+      position: relative;
+    }
+    section.page[data-bg="cream"] { background: var(--cream); color: #1a1813; }
+    section.page[data-bg="cream"] { --text: #1a1813; --muted: #6c6558; --subtle: #9e9788; --line: rgba(26,24,19,.1); }
+
+    .page-head {
+      display: flex; justify-content: space-between; align-items: flex-start; gap: 30px;
+      margin-bottom: 48px;
+      padding-bottom: 22px; border-bottom: 1px solid var(--line);
+    }
+    .page-kicker {
+      font-family: var(--mono); font-size: 10px; color: var(--subtle);
+      letter-spacing: .2em; text-transform: uppercase;
+    }
+    .page-title {
+      font-family: var(--serif); font-size: clamp(40px, 5vw, 64px);
+      font-weight: 400; line-height: 1.02; letter-spacing: -.015em;
+      margin: 8px 0 0;
+    }
+    .page-title em { font-style: italic; color: var(--ember); }
+    .page-num {
+      font-family: var(--mono); font-size: 11px; color: var(--subtle);
+      letter-spacing: .15em;
+    }
+    .page-intro {
+      font-family: var(--serif); font-style: italic; font-size: 20px;
+      color: var(--muted); max-width: 58ch; line-height: 1.45;
+      margin-top: 18px;
+    }
+
+    .eyebrow {
+      font-family: var(--mono); font-size: 10px; color: var(--subtle);
+      letter-spacing: .15em; text-transform: uppercase;
+    }
+    .caption { font-family: var(--mono); font-size: 10px; color: var(--muted); letter-spacing: .05em; }
+
+    .grid { display: grid; gap: 28px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+    .card .frame {
+      aspect-ratio: 4 / 3;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+    .card .meta {
+      padding: 14px 16px;
+      display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+      border-top: 1px solid var(--line);
+    }
+    .card .meta .name { font-family: var(--serif); font-style: italic; font-size: 18px; }
+    .card .meta .tag  { font-family: var(--mono); font-size: 10px; color: var(--subtle); letter-spacing: .12em; text-transform: uppercase; }
+
+    /* Cover */
+    .cover {
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: 1fr auto;
+      padding: 56px clamp(40px, 6vw, 96px);
+      position: relative;
+      background: radial-gradient(ellipse at 70% 30%, rgba(226,140,82,.12), transparent 60%), var(--bg);
+    }
+    .cover-hero {
+      display: flex; flex-direction: column; justify-content: center;
+      gap: 26px;
+    }
+    .cover h1 {
+      font-family: var(--serif); font-weight: 400;
+      font-size: clamp(64px, 11vw, 168px);
+      line-height: .92; letter-spacing: -.025em;
+      margin: 0;
+    }
+    .cover h1 em { font-style: italic; color: var(--ember); }
+    .cover-sub {
+      font-family: var(--serif); font-style: italic; font-size: 26px;
+      color: var(--muted); max-width: 48ch; line-height: 1.3;
+    }
+    .cover-foot {
+      display: flex; justify-content: space-between; align-items: end;
+      gap: 40px; flex-wrap: wrap;
+      font-family: var(--mono); font-size: 11px; color: var(--muted);
+      letter-spacing: .05em;
+    }
+    .cover-foot strong { color: var(--text); font-weight: 500; }
+
+    .divider { height: 1px; background: var(--line); margin: 40px 0; }
+    .divider-label {
+      display: flex; align-items: center; gap: 12px;
+      font-family: var(--mono); font-size: 10px; color: var(--subtle);
+      letter-spacing: .15em; text-transform: uppercase;
+      margin: 40px 0 20px;
+    }
+    .divider-label::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+
+    /* Color chips */
+    .swatch { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+    .swatch .chip { aspect-ratio: 5 / 3; }
+    .swatch .chip-info { padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+    .swatch .chip-info .name { font-family: var(--serif); font-style: italic; font-size: 16px; }
+    .swatch .chip-info .hex  { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .swatch .chip-info .tok  { font-family: var(--mono); font-size: 10px; color: var(--subtle); }
+
+    /* Type specimen */
+    .specimen { border: 1px solid var(--line); border-radius: 4px; padding: 28px 32px; background: var(--panel); }
+    .specimen .label { display: flex; gap: 24px; font-family: var(--mono); font-size: 10px; color: var(--subtle); letter-spacing: .12em; text-transform: uppercase; margin-bottom: 14px; }
+    .specimen .big   { font-family: var(--serif); font-size: 96px; line-height: .95; font-weight: 400; letter-spacing: -.02em; }
+    .specimen .scale { display: flex; flex-direction: column; gap: 10px; }
+    .specimen .scale > div { display: flex; align-items: baseline; gap: 24px; border-bottom: 1px dashed var(--line); padding-bottom: 8px; }
+    .specimen .scale .size { font-family: var(--mono); font-size: 10px; color: var(--subtle); width: 120px; letter-spacing: .05em; }
+
+    /* OG mockup */
+    .og {
+      aspect-ratio: 1200 / 630; border-radius: 4px; overflow: hidden; position: relative;
+      background: radial-gradient(ellipse at 85% 20%, rgba(226,140,82,.18), transparent 55%), var(--bg);
+      border: 1px solid var(--line);
+      padding: 56px 64px;
+      display: flex; flex-direction: column; justify-content: space-between;
+    }
+
+    /* Landing hero */
+    .hero {
+      border: 1px solid var(--line); border-radius: 6px;
+      overflow: hidden; background: var(--bg);
+    }
+    .hero-top { padding: 18px 28px; display: flex; align-items: center; gap: 18px; border-bottom: 1px solid var(--line); }
+    .hero-top .nav-links { display: flex; gap: 24px; font-size: 12px; color: var(--muted); margin-left: auto; }
+    .hero-top .cta {
+      background: var(--ember); color: #1a0f08; padding: 8px 16px; border-radius: 3px;
+      font-size: 12px; font-weight: 500;
+    }
+    .hero-body {
+      padding: 72px 56px;
+      display: grid; grid-template-columns: 1.15fr 1fr; gap: 48px;
+      align-items: center; min-height: 420px;
+    }
+    .hero-body h2 { font-family: var(--serif); font-size: clamp(44px, 5.5vw, 72px); font-weight: 400; line-height: 1; letter-spacing: -.02em; margin: 0; }
+    .hero-body h2 em { color: var(--ember); }
+    .hero-body p { color: var(--muted); max-width: 46ch; font-size: 16px; line-height: 1.55; }
+    .hero-stats { display: flex; gap: 28px; margin-top: 28px; }
+    .hero-stats div { border-left: 1px solid var(--line); padding-left: 12px; }
+    .hero-stats .n { font-family: var(--mono); font-size: 24px; }
+    .hero-stats .l { font-family: var(--mono); font-size: 10px; color: var(--subtle); text-transform: uppercase; letter-spacing: .12em; }
+
+    /* Utility */
+    .mono { font-family: var(--mono); }
+    .serif { font-family: var(--serif); }
+    .ember { color: var(--ember); }
+    .muted { color: var(--muted); }
+
+    /* Light-cream variant helpers for applications */
+    .light-card { background: var(--cream); color: #1a1813; border-color: rgba(26,24,19,.1) !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div>
+        <div class="brand">
+          <svg class="brand-mark" viewBox="0 0 32 32" fill="none">
+            <rect x="3"  y="6"  width="26" height="3" fill="#a8c487"/>
+            <rect x="3"  y="12" width="15" height="3" fill="#d4a94a"/>
+            <rect x="3"  y="18" width="22" height="3" fill="#e28c52"/>
+            <rect x="3"  y="24" width="10" height="3" fill="#c8553d"/>
+          </svg>
+          <span class="brand-name">pev</span>
+        </div>
+        <div class="brand-sub">Brand Book · v1.0</div>
+      </div>
+
+      <nav>
+        <ul id="nav">
+          <li><button data-to="cover"><span class="num">00</span>Cover</button></li>
+          <li><button data-to="intro"><span class="num">01</span>Introduction</button></li>
+          <li><button data-to="logo"><span class="num">02</span>Logo</button></li>
+          <li><button data-to="logo-variants"><span class="num">03</span>Logo variants</button></li>
+          <li><button data-to="color"><span class="num">04</span>Color</button></li>
+          <li><button data-to="type"><span class="num">05</span>Typography</button></li>
+          <li><button data-to="icon"><span class="num">06</span>App icon</button></li>
+          <li><button data-to="og"><span class="num">07</span>Social card</button></li>
+          <li><button data-to="hero"><span class="num">08</span>Landing hero</button></li>
+        </ul>
+      </nav>
+
+      <div class="colophon">
+        Parallel Execution Visualizer<br/>
+        Monad · Developer Tooling<br/>
+        <span class="v">v0.4.1 — 2026</span>
+      </div>
+    </aside>
+
+    <main id="main">
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- 00 · COVER -->
+      <section class="page cover" id="cover" style="padding: 0;">
+        <div style="padding: 56px clamp(40px,6vw,96px); display: grid; grid-template-rows: 1fr auto; min-height: 100vh;">
+          <div class="cover-hero">
+            <div class="eyebrow">Monad · Developer Tooling</div>
+            <h1>pev<em>.</em></h1>
+            <div class="cover-sub">A parallel execution visualizer — for developers who want to know, precisely, why their contract isn't scaling.</div>
+          </div>
+          <div class="cover-foot">
+            <div>
+              <div class="eyebrow" style="margin-bottom: 8px;">Brand system</div>
+              <div style="font-family: var(--serif); font-style: italic; font-size: 22px; color: var(--text);">Edition 01 · Spring 2026</div>
+            </div>
+            <div style="text-align: right; line-height: 1.7;">
+              <div><strong>48 pages</strong> · logo · color · type · applications</div>
+              <div style="margin-top: 10px;">pev.monad.dev</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- 01 · INTRO -->
+      <section class="page" id="intro">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Chapter 01</div>
+            <h2 class="page-title"><em>Introduction</em></h2>
+            <p class="page-intro">Parallelism is Monad's defining property. PEV is the developer-facing lens on it — a tool that answers, at a glance, whether a contract is killing that property, and why.</p>
+          </div>
+          <div class="page-num">P. 002</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; margin-top: 20px;">
+          <div>
+            <div class="eyebrow">Principles</div>
+            <div style="display: flex; flex-direction: column; gap: 28px; margin-top: 20px;">
+              <div>
+                <div style="font-family: var(--serif); font-size: 28px; font-style: italic; color: var(--text);">01 &nbsp; Clarity before aesthetics.</div>
+                <div class="muted" style="margin-top: 6px; font-size: 14px; max-width: 52ch; line-height: 1.55;">
+                  The design defers to the data. Decoration exists only where it helps a developer see cause and effect faster.
+                </div>
+              </div>
+              <div>
+                <div style="font-family: var(--serif); font-size: 28px; font-style: italic; color: var(--text);">02 &nbsp; Causality over summary.</div>
+                <div class="muted" style="margin-top: 6px; font-size: 14px; max-width: 52ch; line-height: 1.55;">
+                  A dashboard shows what is. PEV shows what caused what. The brand should feel investigative, not reportorial.
+                </div>
+              </div>
+              <div>
+                <div style="font-family: var(--serif); font-size: 28px; font-style: italic; color: var(--text);">03 &nbsp; Technical, but literate.</div>
+                <div class="muted" style="margin-top: 6px; font-size: 14px; max-width: 52ch; line-height: 1.55;">
+                  Monospace for the truth — hashes, slots, gas. Serif for the voice. Sans for the interface. A three-voice system that stays distinct.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="eyebrow">At a glance</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 4px; overflow: hidden; margin-top: 20px;">
+              <div style="background: var(--panel); padding: 20px;">
+                <div class="caption">Name</div>
+                <div style="font-family: var(--serif); font-style: italic; font-size: 28px; margin-top: 6px;">pev</div>
+                <div class="muted" style="font-size: 12px; margin-top: 4px;">Parallel Execution Visualizer</div>
+              </div>
+              <div style="background: var(--panel); padding: 20px;">
+                <div class="caption">Category</div>
+                <div style="font-family: var(--serif); font-style: italic; font-size: 20px; margin-top: 6px; line-height: 1.2;">Developer introspection tool</div>
+              </div>
+              <div style="background: var(--panel); padding: 20px;">
+                <div class="caption">Tone</div>
+                <div style="font-family: var(--serif); font-style: italic; font-size: 20px; margin-top: 6px; line-height: 1.2;">Editorial · technical · precise</div>
+              </div>
+              <div style="background: var(--panel); padding: 20px;">
+                <div class="caption">Audience</div>
+                <div style="font-family: var(--serif); font-style: italic; font-size: 20px; margin-top: 6px; line-height: 1.2;">Smart contract developers</div>
+              </div>
+            </div>
+
+            <div class="eyebrow" style="margin-top: 32px;">Voice samples</div>
+            <div style="margin-top: 14px; border-left: 2px solid var(--ember); padding-left: 16px;">
+              <div style="font-family: var(--serif); font-style: italic; font-size: 22px; line-height: 1.35; color: var(--text);">
+                "Pool reserves are a single hot slot — contention is the bill you pay."
+              </div>
+              <div class="caption" style="margin-top: 10px;">— copy sample, re-execution hint</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- 02 · LOGO (primary) -->
+      <section class="page" id="logo" data-bg="cream">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Chapter 02</div>
+            <h2 class="page-title">The <em>mark</em></h2>
+            <p class="page-intro">Four stacked bars of unequal length — an abstraction of the execution timeline itself. Each bar is a thread; each length, a transaction's duration. The logo is the product, in miniature.</p>
+          </div>
+          <div class="page-num">P. 008</div>
+        </div>
+
+        <!-- Hero lockup on cream -->
+        <div style="display: flex; justify-content: center; align-items: center; padding: 48px 0 72px;">
+          <div style="display: flex; align-items: center; gap: 36px;">
+            <svg width="180" height="180" viewBox="0 0 32 32" fill="none">
+              <rect x="3"  y="6"  width="26" height="3" fill="#a8c487"/>
+              <rect x="3"  y="12" width="15" height="3" fill="#d4a94a"/>
+              <rect x="3"  y="18" width="22" height="3" fill="#e28c52"/>
+              <rect x="3"  y="24" width="10" height="3" fill="#c8553d"/>
+            </svg>
+            <div style="font-family: var(--serif); font-weight: 400; font-size: 168px; letter-spacing: -.04em; line-height: .85;">pev<span style="color: #e28c52; font-style: italic;">.</span></div>
+          </div>
+        </div>
+
+        <!-- Construction grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+          <div>
+            <div class="eyebrow">Construction</div>
+            <div style="margin-top: 14px; padding: 40px; border: 1px solid rgba(26,24,19,.15); border-radius: 4px; background: rgba(26,24,19,.02);">
+              <svg viewBox="0 0 320 320" width="100%" style="display: block;">
+                <defs>
+                  <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+                    <path d="M 20 0 L 0 0 0 20" fill="none" stroke="rgba(26,24,19,.12)" stroke-width="0.5"/>
+                  </pattern>
+                </defs>
+                <rect width="320" height="320" fill="url(#grid)"/>
+                <g transform="translate(30,60) scale(8.125)">
+                  <rect x="3"  y="6"  width="26" height="3" fill="#a8c487"/>
+                  <rect x="3"  y="12" width="15" height="3" fill="#d4a94a"/>
+                  <rect x="3"  y="18" width="22" height="3" fill="#e28c52"/>
+                  <rect x="3"  y="24" width="10" height="3" fill="#c8553d"/>
+                </g>
+                <!-- measure labels -->
+                <g font-family="JetBrains Mono" font-size="9" fill="#6c6558">
+                  <text x="30" y="50">32u</text>
+                  <text x="30" y="310" text-anchor="start">bar height: 3u · gap: 3u · padding: 3u</text>
+                </g>
+              </svg>
+            </div>
+          </div>
+
+          <div>
+            <div class="eyebrow">Rationale</div>
+            <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 14px; font-size: 14px; line-height: 1.6;">
+              <p style="margin: 0;">Four bars represent the four execution states the tool reveals: <strong style="color: #5c6d4a;">clean</strong>, <strong style="color: #9a7a2a;">delayed</strong>, <strong style="color: #c56b32;">re-executed</strong>, and <strong style="color: #9a3a26;">conflict</strong>. Their unequal lengths mirror a real timeline — never symmetrical, always informative.</p>
+              <p style="margin: 0;">The wordmark pairs a serif with an ember period. The period is a halt — the stop-moment a developer wants to understand.</p>
+            </div>
+
+            <div class="eyebrow" style="margin-top: 28px;">Clearspace & minimum size</div>
+            <div style="margin-top: 14px; display: flex; gap: 24px; align-items: center;">
+              <div style="border: 1px dashed rgba(26,24,19,.3); padding: 16px; border-radius: 2px;">
+                <svg width="48" height="48" viewBox="0 0 32 32">
+                  <rect x="3"  y="6"  width="26" height="3" fill="#a8c487"/>
+                  <rect x="3"  y="12" width="15" height="3" fill="#d4a94a"/>
+                  <rect x="3"  y="18" width="22" height="3" fill="#e28c52"/>
+                  <rect x="3"  y="24" width="10" height="3" fill="#c8553d"/>
+                </svg>
+              </div>
+              <div class="caption" style="font-size: 11px; line-height: 1.5;">
+                Clearspace = height of one bar (3u) on all sides.<br/>
+                Minimum size: 16px (digital), 8mm (print).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Light / dark pair -->
+        <div class="divider-label">Light &amp; dark</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div style="background: var(--cream); border: 1px solid rgba(26,24,19,.1); border-radius: 4px; padding: 56px; display: flex; align-items: center; justify-content: center;">
+            <div style="display: flex; align-items: center; gap: 18px;">
+              <svg width="72" height="72" viewBox="0 0 32 32"><rect x="3" y="6"  width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg>
+              <div style="font-family: var(--serif); font-size: 72px; letter-spacing: -.03em; line-height: .9; color: #1a1813;">pev<span style="color: #e28c52;">.</span></div>
+            </div>
+          </div>
+          <div style="background: #0e0d0b; border: 1px solid rgba(240,230,210,.1); border-radius: 4px; padding: 56px; display: flex; align-items: center; justify-content: center;">
+            <div style="display: flex; align-items: center; gap: 18px;">
+              <svg width="72" height="72" viewBox="0 0 32 32"><rect x="3" y="6"  width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg>
+              <div style="font-family: var(--serif); font-size: 72px; letter-spacing: -.03em; line-height: .9; color: #efe7d4;">pev<span style="color: #e28c52;">.</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══════════════════════════════════════════════════════════ -->
+      <!-- 03 · LOGO VARIANTS (5 directions) -->
+      <section class="page" id="logo-variants">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Chapter 03</div>
+            <h2 class="page-title">Five <em>directions</em></h2>
+            <p class="page-intro">Explorations of what the PEV mark could be. Each captures a different facet of parallel execution. Direction A is the primary.</p>
+          </div>
+          <div class="page-num">P. 014</div>
+        </div>
+
+        <div class="grid" style="grid-template-columns: repeat(2, 1fr); gap: 22px;">
+          <div class="card">
+            <div class="frame" style="background: #141310;">
+              <svg width="140" height="140" viewBox="0 0 32 32">
+                <rect x="3"  y="6"  width="26" height="3" fill="#a8c487"/>
+                <rect x="3"  y="12" width="15" height="3" fill="#d4a94a"/>
+                <rect x="3"  y="18" width="22" height="3" fill="#e28c52"/>
+                <rect x="3"  y="24" width="10" height="3" fill="#c8553d"/>
+              </svg>
+            </div>
+            <div class="meta">
+              <div><div class="tag">A · primary</div><div class="name">Execution bars</div></div>
+              <div class="caption" style="text-align: right;">Timeline as logo<br/>selected ✓</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="frame" style="background: #141310;">
+              <svg width="140" height="140" viewBox="0 0 48 48" fill="none" stroke="#efe7d4" stroke-width="2.5" stroke-linecap="round">
+                <path d="M 8 8 L 8 24 L 24 24 L 24 40"/>
+                <path d="M 8 24 L 24 24 L 24 8" stroke="#e28c52"/>
+                <path d="M 24 24 L 40 24 L 40 40" stroke="#a8c487"/>
+                <circle cx="8"  cy="8"  r="2.5" fill="#efe7d4" stroke="none"/>
+                <circle cx="24" cy="8"  r="2.5" fill="#e28c52" stroke="none"/>
+                <circle cx="40" cy="40" r="2.5" fill="#a8c487" stroke="none"/>
+                <circle cx="24" cy="40" r="2.5" fill="#efe7d4" stroke="none"/>
+              </svg>
+            </div>
+            <div class="meta">
+              <div><div class="tag">B · concept</div><div class="name">Fork / join</div></div>
+              <div class="caption" style="text-align: right;">Parallelism<br/>diagrammatic</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="frame" style="background: #141310;">
+              <svg width="140" height="140" viewBox="0 0 64 64" fill="none">
+                <rect x="10" y="12" width="8"  height="40" fill="#efe7d4"/>
+                <rect x="10" y="12" width="28" height="8"  fill="#efe7d4"/>
+                <rect x="30" y="12" width="8"  height="24" fill="#efe7d4"/>
+                <rect x="10" y="28" width="28" height="8"  fill="#efe7d4"/>
+                <rect x="6"  y="58" width="52" height="3"  fill="#e28c52"/>
+              </svg>
+            </div>
+            <div class="meta">
+              <div><div class="tag">C · monogram</div><div class="name">P, underlined</div></div>
+              <div class="caption" style="text-align: right;">Letterform-led<br/>with accent bar</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="frame" style="background: #141310;">
+              <svg width="160" height="140" viewBox="0 0 80 60" fill="none" stroke-width="1.6">
+                <path d="M 14 14 C 28 8, 42 24, 56 18" stroke="#e28c52" stroke-dasharray="2 2"/>
+                <path d="M 14 14 C 18 30, 36 42, 42 48" stroke="#e28c52"/>
+                <path d="M 56 18 C 48 34, 50 44, 42 48" stroke="#e28c52"/>
+                <circle cx="14" cy="14" r="5" fill="#a8c487"/>
+                <circle cx="56" cy="18" r="5" fill="#d4a94a"/>
+                <circle cx="42" cy="48" r="5" fill="#c8553d"/>
+              </svg>
+            </div>
+            <div class="meta">
+              <div><div class="tag">D · concept</div><div class="name">Conflict triad</div></div>
+              <div class="caption" style="text-align: right;">Graph as logo<br/>nodes + dependency</div>
+            </div>
+          </div>
+          <div class="card" style="grid-column: span 2;">
+            <div class="frame" style="background: #141310; aspect-ratio: 16 / 5;">
+              <div style="font-family: var(--serif); font-size: 132px; letter-spacing: -.04em; line-height: .9; color: #efe7d4;">
+                p<span style="font-style: italic;">e</span>v<span style="color: #e28c52;">.</span>
+              </div>
+            </div>
+            <div class="meta">
+              <div><div class="tag">E · wordmark</div><div class="name">Type-only lockup</div></div>
+              <div class="caption" style="text-align: right;">Instrument Serif · italic e<br/>ember terminator</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider-label">Scale test · direction A</div>
+        <div style="display: flex; align-items: flex-end; gap: 40px; padding: 28px 32px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel);">
+          <div style="display: flex; align-items: flex-end; gap: 32px; flex: 1; flex-wrap: wrap;">
+            <div style="text-align: center;"><svg width="96" height="96" viewBox="0 0 32 32"><rect x="3" y="6" width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg><div class="caption" style="margin-top: 8px;">96px</div></div>
+            <div style="text-align: center;"><svg width="64" height="64" viewBox="0 0 32 32"><rect x="3" y="6" width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg><div class="caption" style="margin-top: 8px;">64px</div></div>
+            <div style="text-align: center;"><svg width="40" height="40" viewBox="0 0 32 32"><rect x="3" y="6" width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg><div class="caption" style="margin-top: 8px;">40px</div></div>
+            <div style="text-align: center;"><svg width="24" height="24" viewBox="0 0 32 32"><rect x="3" y="6" width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg><div class="caption" style="margin-top: 8px;">24px</div></div>
+            <div style="text-align: center;"><svg width="16" height="16" viewBox="0 0 32 32"><rect x="3" y="6" width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg><div class="caption" style="margin-top: 8px;">16px</div></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 · COLOR -->
+      <section class="page" id="color">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Chapter 04</div>
+            <h2 class="page-title"><em>Color</em></h2>
+            <p class="page-intro">A single warm accent on a near-black base. Status colors do the semantic work — sage, amber, terracotta — echoing the execution states revealed in the tool.</p>
+          </div>
+          <div class="page-num">P. 022</div>
+        </div>
+
+        <div class="eyebrow">Primary palette</div>
+        <div class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 14px; margin-bottom: 48px;">
+          <div class="swatch"><div class="chip" style="background: #0e0d0b;"></div><div class="chip-info"><div class="name">Ink</div><div class="hex">#0E0D0B</div><div class="tok">--bg</div></div></div>
+          <div class="swatch"><div class="chip" style="background: #f6f0e1;"></div><div class="chip-info"><div class="name">Cream</div><div class="hex">#F6F0E1</div><div class="tok">--paper</div></div></div>
+          <div class="swatch"><div class="chip" style="background: #efe7d4;"></div><div class="chip-info"><div class="name">Bone</div><div class="hex">#EFE7D4</div><div class="tok">--text</div></div></div>
+          <div class="swatch"><div class="chip" style="background: #e28c52;"></div><div class="chip-info"><div class="name">Ember</div><div class="hex">#E28C52</div><div class="tok">--accent</div></div></div>
+        </div>
+
+        <div class="eyebrow">Status palette</div>
+        <div class="grid" style="grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 14px; margin-bottom: 48px;">
+          <div class="swatch"><div class="chip" style="background: #a8c487;"></div><div class="chip-info"><div class="name">Sage</div><div class="hex">#A8C487</div><div class="tok">--status-clean</div></div></div>
+          <div class="swatch"><div class="chip" style="background: #d4a94a;"></div><div class="chip-info"><div class="name">Amber</div><div class="hex">#D4A94A</div><div class="tok">--status-delayed</div></div></div>
+          <div class="swatch"><div class="chip" style="background: #c8553d;"></div><div class="chip-info"><div class="name">Terracotta</div><div class="hex">#C8553D</div><div class="tok">--status-reexec</div></div></div>
+          <div class="swatch"><div class="chip" style="background: #8a8577;"></div><div class="chip-info"><div class="name">Stone</div><div class="hex">#8A8577</div><div class="tok">--muted</div></div></div>
+        </div>
+
+        <div class="eyebrow">Surface scale</div>
+        <div style="display: grid; grid-template-columns: repeat(6, 1fr); margin-top: 14px; border: 1px solid var(--line); border-radius: 4px; overflow: hidden;">
+          <div style="background: #0a0907; aspect-ratio: 3/2; padding: 12px;" class="mono caption">surface-00<br/>#0A0907</div>
+          <div style="background: #0e0d0b; aspect-ratio: 3/2; padding: 12px;" class="mono caption">surface-01<br/>#0E0D0B</div>
+          <div style="background: #141310; aspect-ratio: 3/2; padding: 12px;" class="mono caption">surface-02<br/>#141310</div>
+          <div style="background: #1a1813; aspect-ratio: 3/2; padding: 12px;" class="mono caption">surface-03<br/>#1A1813</div>
+          <div style="background: #211e17; aspect-ratio: 3/2; padding: 12px;" class="mono caption">surface-04<br/>#211E17</div>
+          <div style="background: #2a261d; aspect-ratio: 3/2; padding: 12px;" class="mono caption">surface-05<br/>#2A261D</div>
+        </div>
+
+        <div style="margin-top: 48px; display: grid; grid-template-columns: 1fr 1fr; gap: 32px;">
+          <div>
+            <div class="eyebrow">Usage ratio</div>
+            <div style="display: flex; height: 48px; margin-top: 14px; border-radius: 3px; overflow: hidden; border: 1px solid var(--line);">
+              <div style="flex: 60; background: #0e0d0b; display: flex; align-items: center; justify-content: center;" class="caption">Ink 60%</div>
+              <div style="flex: 28; background: #efe7d4; display: flex; align-items: center; justify-content: center; color: #1a1813;" class="caption">Bone 28%</div>
+              <div style="flex: 8;  background: #e28c52; display: flex; align-items: center; justify-content: center; color: #1a0f08;" class="caption">Ember 8%</div>
+              <div style="flex: 4;  background: linear-gradient(90deg,#a8c487 0 33%,#d4a94a 33% 66%,#c8553d 66% 100%);" title="Status 4%"></div>
+            </div>
+            <div class="caption" style="margin-top: 8px;">60 / 28 / 8 / 4 — ink, text, accent, status</div>
+          </div>
+          <div>
+            <div class="eyebrow">Accessibility</div>
+            <div style="margin-top: 14px; font-family: var(--mono); font-size: 11px; line-height: 1.8;">
+              <div>Bone on Ink · <span style="color: var(--ember);">14.2:1</span> <span class="muted">AAA</span></div>
+              <div>Stone on Ink · <span style="color: var(--ember);">5.8:1</span> <span class="muted">AA</span></div>
+              <div>Ember on Ink · <span style="color: var(--ember);">6.1:1</span> <span class="muted">AA</span></div>
+              <div>Ink on Ember · <span style="color: var(--ember);">6.1:1</span> <span class="muted">AA</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 05 · TYPOGRAPHY -->
+      <section class="page" id="type" data-bg="cream">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Chapter 05</div>
+            <h2 class="page-title">Three <em>voices</em></h2>
+            <p class="page-intro">A serif for the headline, a sans for the interface, a monospace for the data. Each has a job; they never trade places.</p>
+          </div>
+          <div class="page-num">P. 028</div>
+        </div>
+
+        <div class="specimen light-card" style="margin-bottom: 28px;">
+          <div class="label"><span style="color: #9e9788;">Display</span><span>Instrument Serif</span><span>Italic available</span><span>Google Fonts · open source</span></div>
+          <div style="font-family: 'Instrument Serif'; font-size: 180px; line-height: .9; font-weight: 400; letter-spacing: -.03em; color: #1a1813;">Aa <em>Bb</em> <span style="color: #e28c52;">.</span></div>
+          <div style="font-family: 'Instrument Serif'; font-size: 32px; line-height: 1.2; font-style: italic; color: #4a443a; margin-top: 28px; max-width: 42ch;">
+            "Is my contract killing parallelism — and why?"
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(26,24,19,.1);">
+            <div>
+              <div style="font-family: 'JetBrains Mono'; font-size: 10px; color: #9e9788; letter-spacing: .1em; text-transform: uppercase;">Display · H1</div>
+              <div style="font-family: 'Instrument Serif'; font-size: 56px; line-height: .95; color: #1a1813; margin-top: 6px;">Parallel, observed.</div>
+            </div>
+            <div>
+              <div style="font-family: 'JetBrains Mono'; font-size: 10px; color: #9e9788; letter-spacing: .1em; text-transform: uppercase;">Display · H2 italic</div>
+              <div style="font-family: 'Instrument Serif'; font-style: italic; font-size: 40px; line-height: 1; color: #1a1813; margin-top: 6px;">Execution timeline</div>
+            </div>
+            <div>
+              <div style="font-family: 'JetBrains Mono'; font-size: 10px; color: #9e9788; letter-spacing: .1em; text-transform: uppercase;">Editorial pull</div>
+              <div style="font-family: 'Instrument Serif'; font-style: italic; font-size: 22px; line-height: 1.3; color: #4a443a; margin-top: 6px;">Contention is the bill you pay for shared state.</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <div class="specimen light-card">
+            <div class="label"><span style="color: #9e9788;">Interface</span><span>Inter Tight</span><span>400 / 500 / 600</span></div>
+            <div style="font-family: 'Inter Tight'; font-size: 96px; line-height: 1; font-weight: 500; color: #1a1813; letter-spacing: -.02em;">Aa</div>
+            <div class="scale" style="margin-top: 24px;">
+              <div><span class="size" style="color: #9e9788;">18 / 500</span> <span style="font-family: 'Inter Tight'; font-size: 18px; font-weight: 500; color: #1a1813;">Analyze parallel execution</span></div>
+              <div><span class="size" style="color: #9e9788;">14 / 400</span> <span style="font-family: 'Inter Tight'; font-size: 14px; color: #1a1813;">28 transactions across block #4,218,904</span></div>
+              <div><span class="size" style="color: #9e9788;">13 / 400</span> <span style="font-family: 'Inter Tight'; font-size: 13px; color: #4a443a;">Pool reserves are a single hot slot.</span></div>
+              <div><span class="size" style="color: #9e9788;">11 / 500</span> <span style="font-family: 'Inter Tight'; font-size: 11px; font-weight: 500; color: #1a1813;">Re-executed ×3</span></div>
+            </div>
+          </div>
+          <div class="specimen light-card">
+            <div class="label"><span style="color: #9e9788;">Data</span><span>JetBrains Mono</span><span>400 / 500</span></div>
+            <div style="font-family: 'JetBrains Mono'; font-size: 96px; line-height: 1; font-weight: 500; color: #1a1813; letter-spacing: -.02em;">Aa</div>
+            <div class="scale" style="margin-top: 24px;">
+              <div><span class="size" style="color: #9e9788;">13 / hash</span> <span style="font-family: 'JetBrains Mono'; font-size: 13px; color: #1a1813;">0x44b10ff1e7…a9c80c8d</span></div>
+              <div><span class="size" style="color: #9e9788;">12 / slot</span> <span style="font-family: 'JetBrains Mono'; font-size: 12px; color: #1a1813;">UniV2Pair.reserves</span></div>
+              <div><span class="size" style="color: #9e9788;">11 / label</span> <span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #1a1813; letter-spacing: .08em; text-transform: uppercase;">CONTENTION</span></div>
+              <div><span class="size" style="color: #9e9788;">10 / caption</span> <span style="font-family: 'JetBrains Mono'; font-size: 10px; color: #4a443a;">gas: 188,500 · retries: 3 · 55ms</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 06 · APP ICON -->
+      <section class="page" id="icon">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Chapter 06</div>
+            <h2 class="page-title">App <em>icon</em></h2>
+            <p class="page-intro">Same four bars, centered in a squircle. One icon for every context — from 1024px master to 16px favicon.</p>
+          </div>
+          <div class="page-num">P. 034</div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: auto 1fr; gap: 48px; align-items: center; margin-bottom: 48px;">
+          <div>
+            <svg width="320" height="320" viewBox="0 0 256 256">
+              <rect width="256" height="256" rx="56" fill="#0e0d0b"/>
+              <g transform="translate(36, 60)">
+                <rect x="0"  y="0"   width="184" height="20" rx="2" fill="#a8c487"/>
+                <rect x="0"  y="36"  width="108" height="20" rx="2" fill="#d4a94a"/>
+                <rect x="0"  y="72"  width="156" height="20" rx="2" fill="#e28c52"/>
+                <rect x="0"  y="108" width="72"  height="20" rx="2" fill="#c8553d"/>
+              </g>
+            </svg>
+            <div class="caption" style="margin-top: 12px; text-align: center;">1024 × 1024 · master</div>
+          </div>
+          <div style="display: flex; align-items: flex-end; gap: 28px; flex-wrap: wrap;">
+            <div style="text-align: center;"><svg width="128" height="128" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="#0e0d0b"/><g transform="translate(36, 60)"><rect x="0" y="0" width="184" height="20" rx="2" fill="#a8c487"/><rect x="0" y="36" width="108" height="20" rx="2" fill="#d4a94a"/><rect x="0" y="72" width="156" height="20" rx="2" fill="#e28c52"/><rect x="0" y="108" width="72" height="20" rx="2" fill="#c8553d"/></g></svg><div class="caption" style="margin-top: 8px;">128</div></div>
+            <div style="text-align: center;"><svg width="96" height="96" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="#0e0d0b"/><g transform="translate(36, 60)"><rect x="0" y="0" width="184" height="20" rx="2" fill="#a8c487"/><rect x="0" y="36" width="108" height="20" rx="2" fill="#d4a94a"/><rect x="0" y="72" width="156" height="20" rx="2" fill="#e28c52"/><rect x="0" y="108" width="72" height="20" rx="2" fill="#c8553d"/></g></svg><div class="caption" style="margin-top: 8px;">96</div></div>
+            <div style="text-align: center;"><svg width="64" height="64" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="#0e0d0b"/><g transform="translate(36, 60)"><rect x="0" y="0" width="184" height="20" rx="2" fill="#a8c487"/><rect x="0" y="36" width="108" height="20" rx="2" fill="#d4a94a"/><rect x="0" y="72" width="156" height="20" rx="2" fill="#e28c52"/><rect x="0" y="108" width="72" height="20" rx="2" fill="#c8553d"/></g></svg><div class="caption" style="margin-top: 8px;">64</div></div>
+            <div style="text-align: center;"><svg width="32" height="32" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="#0e0d0b"/><g transform="translate(36, 60)"><rect x="0" y="0" width="184" height="20" rx="2" fill="#a8c487"/><rect x="0" y="36" width="108" height="20" rx="2" fill="#d4a94a"/><rect x="0" y="72" width="156" height="20" rx="2" fill="#e28c52"/><rect x="0" y="108" width="72" height="20" rx="2" fill="#c8553d"/></g></svg><div class="caption" style="margin-top: 8px;">32</div></div>
+            <div style="text-align: center;"><svg width="16" height="16" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="#0e0d0b"/><g transform="translate(36, 60)"><rect x="0" y="0" width="184" height="20" rx="2" fill="#a8c487"/><rect x="0" y="36" width="108" height="20" rx="2" fill="#d4a94a"/><rect x="0" y="72" width="156" height="20" rx="2" fill="#e28c52"/><rect x="0" y="108" width="72" height="20" rx="2" fill="#c8553d"/></g></svg><div class="caption" style="margin-top: 8px;">16 · favicon</div></div>
+          </div>
+        </div>
+
+        <div class="eyebrow">In context</div>
+        <div style="margin-top: 14px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px;">
+          <div style="background: #1f1f22; border-radius: 8px 8px 0 0; border: 1px solid var(--line); padding: 10px 12px; display: flex; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; background: #2a2a2e; padding: 6px 10px; border-radius: 6px; min-width: 200px;">
+              <svg width="14" height="14" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="#0e0d0b"/><g transform="translate(36, 60)"><rect x="0" y="0" width="184" height="20" rx="2" fill="#a8c487"/><rect x="0" y="36" width="108" height="20" rx="2" fill="#d4a94a"/><rect x="0" y="72" width="156" height="20" rx="2" fill="#e28c52"/><rect x="0" y="108" width="72" height="20" rx="2" fill="#c8553d"/></g></svg>
+              <span style="font-size: 12px; color: #efe7d4;">pev · 0x44b10ff1…</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: #8a8577;">
+              <div style="width: 14px; height: 14px; background: #444; border-radius: 2px;"></div>docs
+            </div>
+          </div>
+          <div style="background: #0e0d0b; border: 1px solid var(--line); border-radius: 4px; padding: 20px; display: flex; align-items: center; gap: 14px;">
+            <svg width="48" height="48" viewBox="0 0 256 256"><rect width="256" height="256" rx="56" fill="#0e0d0b"/><g transform="translate(36, 60)"><rect x="0" y="0" width="184" height="20" rx="2" fill="#a8c487"/><rect x="0" y="36" width="108" height="20" rx="2" fill="#d4a94a"/><rect x="0" y="72" width="156" height="20" rx="2" fill="#e28c52"/><rect x="0" y="108" width="72" height="20" rx="2" fill="#c8553d"/></g></svg>
+            <div>
+              <div style="font-family: var(--serif); font-size: 22px; font-style: italic;">pev</div>
+              <div class="caption">dock · launcher · OS icon</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 07 · SOCIAL CARD -->
+      <section class="page" id="og" data-bg="cream">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Chapter 07</div>
+            <h2 class="page-title">Social <em>card</em></h2>
+            <p class="page-intro">1200 × 630. The product idea in a single frame — a thumbnail of the timeline behind the promise.</p>
+          </div>
+          <div class="page-num">P. 038</div>
+        </div>
+
+        <div class="og" style="background: radial-gradient(ellipse at 85% 20%, rgba(226,140,82,.22), transparent 55%), #0e0d0b; color: #efe7d4;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 14px;">
+              <svg width="44" height="44" viewBox="0 0 32 32"><rect x="3" y="6" width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg>
+              <div style="font-family: var(--serif); font-size: 40px; letter-spacing: -.03em; color: #efe7d4;">pev<span style="color: #e28c52;">.</span></div>
+            </div>
+            <div style="font-family: var(--mono); font-size: 14px; color: #8a8577; letter-spacing: .1em;">PEV.MONAD.DEV</div>
+          </div>
+
+          <div>
+            <div style="font-family: var(--mono); font-size: 13px; color: #8a8577; letter-spacing: .2em; text-transform: uppercase; margin-bottom: 14px;">Parallel Execution Visualizer</div>
+            <div style="font-family: var(--serif); font-size: 84px; line-height: .98; letter-spacing: -.02em; color: #efe7d4; max-width: 18ch;">Is your contract <em style="color: #e28c52;">killing</em> parallelism?</div>
+            <div style="font-family: var(--serif); font-style: italic; font-size: 26px; color: #8a8577; margin-top: 18px; max-width: 42ch;">See exactly which storage slots are contended, and why.</div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; gap: 3px;"><div style="height: 8px; width: 120px; background: #a8c487;"></div><div style="height: 8px; width: 180px; background: #a8c487;"></div><div style="height: 8px; flex: 1; background: repeating-linear-gradient(135deg, #c8553d, #c8553d 4px, #0e0d0b 4px, #0e0d0b 8px);"></div></div>
+            <div style="display: flex; gap: 3px;"><div style="height: 8px; width: 80px; background: #a8c487;"></div><div style="height: 8px; width: 140px; background: #d4a94a;"></div><div style="height: 8px; width: 90px; background: #a8c487;"></div><div style="height: 8px; flex: 1; background: #d4a94a;"></div></div>
+            <div style="display: flex; gap: 3px;"><div style="height: 8px; width: 200px; background: repeating-linear-gradient(135deg, #c8553d, #c8553d 4px, #0e0d0b 4px, #0e0d0b 8px);"></div><div style="height: 8px; flex: 1; background: #a8c487;"></div></div>
+          </div>
+        </div>
+
+        <div class="caption" style="text-align: center; margin-top: 12px;">1200 × 630 · og:image · twitter:card · linkedin</div>
+      </section>
+
+      <!-- 08 · LANDING HERO -->
+      <section class="page" id="hero">
+        <div class="page-head">
+          <div>
+            <div class="page-kicker">Chapter 08</div>
+            <h2 class="page-title">Landing <em>hero</em></h2>
+            <p class="page-intro">How the brand behaves on its own site. A single, confident promise above the fold.</p>
+          </div>
+          <div class="page-num">P. 042</div>
+        </div>
+
+        <div class="hero">
+          <div class="hero-top">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <svg width="22" height="22" viewBox="0 0 32 32"><rect x="3" y="6" width="26" height="3" fill="#a8c487"/><rect x="3" y="12" width="15" height="3" fill="#d4a94a"/><rect x="3" y="18" width="22" height="3" fill="#e28c52"/><rect x="3" y="24" width="10" height="3" fill="#c8553d"/></svg>
+              <span style="font-family: var(--serif); font-size: 20px; letter-spacing: -.01em;">pev<span style="color: var(--ember);">.</span></span>
+            </div>
+            <div class="nav-links">
+              <a>Docs</a><a>Playground</a><a>Changelog</a><a>GitHub</a>
+            </div>
+            <div class="cta">Analyze a tx →</div>
+          </div>
+
+          <div class="hero-body">
+            <div>
+              <div class="eyebrow" style="margin-bottom: 18px;">Parallel Execution Visualizer · for Monad</div>
+              <h2>Is your contract <em>killing</em> parallelism?</h2>
+              <p style="margin-top: 22px;">Paste a transaction hash or contract address. PEV reconstructs the execution graph, surfaces storage contention, and tells you exactly which slots are costing you throughput.</p>
+              <div style="display: flex; gap: 10px; margin-top: 28px; align-items: center;">
+                <div style="flex: 1; padding: 12px 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 3px; font-family: var(--mono); font-size: 12px; color: var(--muted);">0x… paste tx hash or contract</div>
+                <button style="background: var(--ember); color: #1a0f08; padding: 12px 18px; border-radius: 3px; font-size: 13px; font-weight: 500;">Analyze →</button>
+              </div>
+              <div class="hero-stats">
+                <div><div class="n">4.2M</div><div class="l">blocks indexed</div></div>
+                <div><div class="n">28ms</div><div class="l">median p50</div></div>
+                <div><div class="n">100%</div><div class="l">open source</div></div>
+              </div>
+            </div>
+
+            <div style="background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 20px; font-family: var(--mono); font-size: 10px;">
+              <div style="display: flex; justify-content: space-between; color: var(--subtle); margin-bottom: 10px;">
+                <span>block #4,218,904</span>
+                <span>parallelism 71/100</span>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 4px;">
+                <div style="display: flex; gap: 3px;">
+                  <div style="height: 14px; width: 18%; background: #a8c487; border-radius: 2px;"></div>
+                  <div style="height: 14px; width: 14%; background: #a8c487; border-radius: 2px;"></div>
+                  <div style="height: 14px; width: 22%; background: repeating-linear-gradient(135deg, #c8553d, #c8553d 3px, #0e0d0b 3px, #0e0d0b 6px); border-radius: 2px;"></div>
+                  <div style="height: 14px; flex: 1; background: #a8c487; border-radius: 2px;"></div>
+                </div>
+                <div style="display: flex; gap: 3px;">
+                  <div style="height: 14px; width: 12%; background: #a8c487; border-radius: 2px;"></div>
+                  <div style="height: 14px; width: 20%; background: #d4a94a; border-radius: 2px;"></div>
+                  <div style="height: 14px; width: 16%; background: #a8c487; border-radius: 2px;"></div>
+                  <div style="height: 14px; flex: 1; background: #d4a94a; border-radius: 2px;"></div>
+                </div>
+                <div style="display: flex; gap: 3px;">
+                  <div style="height: 14px; width: 30%; background: repeating-linear-gradient(135deg, #c8553d, #c8553d 3px, #0e0d0b 3px, #0e0d0b 6px); border-radius: 2px;"></div>
+                  <div style="height: 14px; width: 14%; background: #a8c487; border-radius: 2px;"></div>
+                  <div style="height: 14px; flex: 1; background: #a8c487; border-radius: 2px;"></div>
+                </div>
+                <div style="display: flex; gap: 3px;">
+                  <div style="height: 14px; width: 20%; background: #d4a94a; border-radius: 2px;"></div>
+                  <div style="height: 14px; width: 18%; background: #a8c487; border-radius: 2px;"></div>
+                  <div style="height: 14px; width: 14%; background: #d4a94a; border-radius: 2px;"></div>
+                  <div style="height: 14px; flex: 1; background: #a8c487; border-radius: 2px;"></div>
+                </div>
+              </div>
+              <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; color: var(--subtle);">
+                <span>28 txs · 5 threads</span>
+                <span style="color: var(--ember);">● wmonUSDC hotspot</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: var(--subtle); letter-spacing: .1em;">
+          <span>PEV · BRAND BOOK</span>
+          <span>EDITION 01 · SPRING 2026</span>
+          <span>PEV.MONAD.DEV</span>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      const main = document.getElementById('main');
+      const buttons = [...document.querySelectorAll('#nav button')];
+
+      function smoothScrollTo(el, target, dur) {
+        const start = el.scrollTop;
+        const d = target - start;
+        const duration = dur || 450;
+        const steps = 24;
+        const stepMs = duration / steps;
+        for (let i = 1; i <= steps; i++) {
+          setTimeout(() => {
+            const p = i / steps;
+            const eased = 1 - Math.pow(1 - p, 3);
+            el.scrollTop = start + d * eased;
+          }, i * stepMs);
+        }
+      }
+
+      buttons.forEach(b => {
+        b.addEventListener('click', () => {
+          const id = b.dataset.to;
+          const el = document.getElementById(id);
+          if (!el || !main) return;
+          smoothScrollTo(main, el.offsetTop, 500);
+        });
+      });
+
+      // Highlight the active page based on scroll position.
+      const sections = buttons
+        .map(b => document.getElementById(b.dataset.to))
+        .filter(Boolean);
+      function syncActive() {
+        const y = main.scrollTop + 80;
+        let active = 0;
+        for (let i = 0; i < sections.length; i++) {
+          if (sections[i].offsetTop <= y) active = i;
+        }
+        buttons.forEach((b, i) => b.classList.toggle('active', i === active));
+      }
+      main.addEventListener('scroll', syncActive, { passive: true });
+      syncActive();
+    })();
+  </script>
+</body>
+</html>
