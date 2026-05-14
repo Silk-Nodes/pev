@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Parallel Execution Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; padding: 0; background: #0e0d0b; }
+    body { font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    button { font-family: inherit; }
+  </style>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="demo-data.js"></script>
+  <script type="text/babel" src="tweaks-panel.jsx"></script>
+  <script type="text/babel" src="pev-core.jsx"></script>
+  <script type="text/babel" src="variation-a.jsx"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+      "accent": "#e28c52",
+      "cleanColor": "#a8c487",
+      "delayedColor": "#d4a94a",
+      "reexecColor": "#c8553d",
+      "bg": "#0e0d0b",
+      "panel": "#141310"
+    }/*EDITMODE-END*/;
+
+    function App() {
+      const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+      if (window.themeA) {
+        window.themeA.accent = tweaks.accent;
+        window.themeA.status.clean = tweaks.cleanColor;
+        window.themeA.status.delayed = tweaks.delayedColor;
+        window.themeA.status.reexec = tweaks.reexecColor;
+        window.themeA.bg = tweaks.bg;
+        window.themeA.panel = tweaks.panel;
+      }
+
+      return (
+        <>
+          <window.VariationA />
+
+          <TweaksPanel title="Tweaks">
+            <TweakSection label="Accent" />
+            <TweakColor label="Ember" value={tweaks.accent} onChange={v => setTweak('accent', v)} />
+
+            <TweakSection label="Status palette" />
+            <TweakColor label="Clean"       value={tweaks.cleanColor}   onChange={v => setTweak('cleanColor', v)} />
+            <TweakColor label="Delayed"     value={tweaks.delayedColor} onChange={v => setTweak('delayedColor', v)} />
+            <TweakColor label="Re-executed" value={tweaks.reexecColor}  onChange={v => setTweak('reexecColor', v)} />
+
+            <TweakSection label="Surfaces" />
+            <TweakColor label="Background" value={tweaks.bg}    onChange={v => setTweak('bg', v)} />
+            <TweakColor label="Panel"      value={tweaks.panel} onChange={v => setTweak('panel', v)} />
+          </TweaksPanel>
+        </>
+      );
+    }
+
+    setTimeout(() => {
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    }, 50);
+  </script>
+</body>
+</html>

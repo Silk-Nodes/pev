@@ -1,0 +1,149 @@
+/**
+ * db.ts — Postgres connection pool + small typed query helpers.
+ *
+ * Used by:
+ *   • Server components (block page, landing) — read indexed data
+ *   • API route handlers (Phase 4) — read indexed data
+ *   • Indexer (`scripts/indexer.ts`) — write traced blocks
+ *   • Migration runner (`scripts/migrate.ts`) — schema management
+ *
+ * Connection pool sizing:
+ *   • Next.js: each Node process = one pool, max 10 connections is fine
+ *     for our read-heavy workload (most reads hit the JSONB blob in 1
+ *     query)
+ *   • Indexer: separate process, separate pool, max 6 (one per worker
+ *     plus headroom)
+ *
+ * Pool is created lazily so importing this module from a context
+ * without DATABASE_URL set (e.g. a test) doesn't error at import time.
+ */
+
+import { Pool, type PoolConfig, type QueryResult, type QueryResultRow } from "pg";
+
+let _pool: Pool | null = null;
+
+function buildPoolConfig(): PoolConfig {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    throw new Error(
+      "DATABASE_URL is not set. Copy .env.example to .env.local and fill in your Postgres connection string.",
+    );
+  }
+  return {
+    connectionString: url,
+    max: Number(process.env.DB_POOL_MAX ?? 10),
+    // Keep idle clients around — avoid handshake on every request
+    idleTimeoutMillis: 30_000,
+    // Fail fast if the server is unreachable rather than hanging
+    connectionTimeoutMillis: 5_000,
+    // Allow self-signed certs for local/private-network Postgres if
+    // DATABASE_URL includes ?sslmode=require but no CA chain
+    ssl: url.includes("sslmode=require")
+      ? { rejectUnauthorized: false }
+      : undefined,
+  };
+}
+
+/**
+ * Get the shared pg pool. Created on first call.
+ * In long-running processes (indexer) keep it for the lifetime of the
+ * process; in serverless contexts (Next.js route handlers) the pool is
+ * scoped to the warm container's lifetime.
+ */
+export function getPool(): Pool {
+  if (!_pool) {
+    _pool = new Pool(buildPoolConfig());
+    _pool.on("error", (err) => {
+      // Pool-level error: a client died while idle. Pool will recover.
+      // Log but don't crash; individual queries will throw if affected.
+      console.error("[db] pool error:", err.message);
+    });
+  }
+  return _pool;
+}
+
+/**
+ * Run a parameterized query. Thin wrapper that infers the row type so
+ * call sites don't have to type the generic at every call.
+ *
+ * Example:
+ *   const { rows } = await query<{ number: string; tx_count: number }>(
+ *     "SELECT number::text, tx_count FROM blocks WHERE number = $1",
+ *     [blockNumber],
+ *   );
+ */
+export async function query<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: unknown[],
+): Promise<QueryResult<T>> {
+  return getPool().query<T>(text, params);
+}
+
+/**
+ * Convenience: run a query and return just the rows.
+ */
+export async function queryRows<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: unknown[],
+): Promise<T[]> {
+  const result = await query<T>(text, params);
+  return result.rows;
+}
+
+/**
+ * Convenience: run a query and return the first row, or null.
+ * Useful for primary-key lookups.
+ */
+export async function queryOne<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: unknown[],
+): Promise<T | null> {
+  const result = await query<T>(text, params);
+  return result.rows[0] ?? null;
+}
+
+/**
+ * Run a function inside a transaction. Commits on success, rolls back
+ * on error. Used by the indexer to write a block + its txs + conflicts
+ * + hot slots atomically.
+ */
+export async function withTransaction<T>(
+  fn: (client: import("pg").PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {
+      /* swallow — primary error is more useful */
+    });
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Cleanly shut down the pool. Used by long-running scripts on SIGTERM.
+ */
+export async function closePool(): Promise<void> {
+  if (_pool) {
+    await _pool.end();
+    _pool = null;
+  }
+}
+
+/**
+ * Returns true if the timescaledb extension is installed in the current
+ * database. Used by the migration runner to decide whether to apply
+ * 002_timescale.sql.
+ */
+export async function hasTimescaleDB(): Promise<boolean> {
+  const row = await queryOne<{ exists: boolean }>(
+    "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') AS exists",
+  );
+  return row?.exists ?? false;
+}

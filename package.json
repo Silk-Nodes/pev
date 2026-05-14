@@ -1,0 +1,32 @@
+{
+  "name": "pev",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Parallel Execution Visualizer for Monad — by Silk Nodes",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
+    "db:status": "tsx --env-file=.env.local scripts/migrate.ts --status",
+    "indexer": "tsx --env-file=.env.local scripts/indexer.ts",
+    "indexer:backfill": "tsx --env-file=.env.local scripts/indexer.ts --backfill",
+    "probe": "tsx --env-file=.env.local scripts/probe-block.ts"
+  },
+  "dependencies": {
+    "next": "^15.5.15",
+    "pg": "^8.13.0",
+    "pg-boss": "^10.1.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.10",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}
