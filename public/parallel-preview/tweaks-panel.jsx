@@ -146,7 +146,7 @@ function useTweaks(defaults) {
 
 // ── TweaksPanel ─────────────────────────────────────────────────────────────
 // Floating shell. Registers the protocol listener BEFORE announcing
-// availability — if the announce ran first, the host's activate could land
+// availability, if the announce ran first, the host's activate could land
 // before our handler exists and the toolbar toggle would silently no-op.
 // The close button posts __edit_mode_dismissed so the host's toolbar toggle
 // flips off in lockstep; the host echoes __deactivate_edit_mode back which
@@ -292,7 +292,7 @@ function TweakRadio({ label, value, options, onChange }) {
   const n = opts.length;
 
   // The active value is read by pointer-move handlers attached for the lifetime
-  // of a drag — ref it so a stale closure doesn't fire onChange for every move.
+  // of a drag, ref it so a stale closure doesn't fire onChange for every move.
   const valueRef = React.useRef(value);
   valueRef.current = value;
 

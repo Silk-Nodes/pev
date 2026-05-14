@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * SummaryMetrics — the four-metric strip from variation-a's masthead.
+ * SummaryMetrics, the four-metric strip from variation-a's masthead.
  *
  * Honest data adaptations (decided in design review):
  *   - PARALLELISM (0/100)        ← derived from parallelism factor
@@ -51,7 +51,7 @@ export default function SummaryMetrics() {
   ];
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+    <div className="pev-grid-stats-4" style={{ gap: 12 }}>
       {items.map((it) => (
         <div
           key={it.label}

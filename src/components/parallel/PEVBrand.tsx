@@ -1,6 +1,6 @@
 /**
- * PEVBrand — the brand mark and wordmark, ported from the PEV Brand Book
- * (public/parallel-preview/brand-book.html, chapters 02–03).
+ * PEVBrand, the brand mark and wordmark, ported from the PEV Brand Book
+ * (public/parallel-preview/brand-book.html, chapters 02-03).
  *
  * The mark is four stacked colored bars of unequal length, an abstraction
  * of the execution timeline itself:
@@ -10,22 +10,22 @@
  *   - Terracotta #c8553d → conflict / contention
  *
  * The wordmark pairs Instrument Serif (italic optional) with an ember "."
- * — the period reads as "the halt; the stop-moment a developer wants to
+ *, the period reads as "the halt; the stop-moment a developer wants to
  * understand" (per the brand book).
  *
- * These are pure SVG/CSS, no client-side state — safe to render server-side.
+ * These are pure SVG/CSS, no client-side state, safe to render server-side.
  */
 
 import { themeA } from "./theme";
 
 export interface PEVMarkProps {
   size?: number;
-  /** for use over a light surface — no effect on the bar colors themselves */
+  /** for use over a light surface, no effect on the bar colors themselves */
   className?: string;
 }
 
 /**
- * The 4-bar logo mark. Pure SVG, no background — drop it on any surface.
+ * The 4-bar logo mark. Pure SVG, no background, drop it on any surface.
  * Aspect ratio is fixed at 1:1 (32×32 viewBox).
  */
 export function PEVMark({ size = 28, className }: PEVMarkProps) {
@@ -66,7 +66,7 @@ export function PEVAppIcon({ size = 64 }: { size?: number }) {
 }
 
 export interface PEVWordmarkProps {
-  /** font-size in px (drives the visual size — period is colored in the same size) */
+  /** font-size in px (drives the visual size, period is colored in the same size) */
   size?: number;
   /** color for the "pev" text. Period is always ember. */
   color?: string;
@@ -76,7 +76,7 @@ export interface PEVWordmarkProps {
 
 /**
  * Wordmark: serif "pev" with an ember period.
- * The period is the brand's "halt moment" — color is always ember regardless
+ * The period is the brand's "halt moment", color is always ember regardless
  * of the surrounding text color.
  */
 export function PEVWordmark({

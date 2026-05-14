@@ -6,9 +6,19 @@ node_modules/
 out/
 
 # env
+# Block every variation of .env files. Only .env.example (the
+# committed template) is exempted. Catches .env, .env.local,
+# .env.production.local, .env.development.local, .env.*.bak, etc.
 .env
-.env.local
-.env.production
+.env.*
+!.env.example
+
+# Postgres dumps, log files, anything operational
+*.dump
+*.sql.gz
+*.log
+deploy/secrets/
+deploy/local/
 
 # debug
 npm-debug.log*

@@ -1,4 +1,4 @@
-// Variation C — Terminal / Monospace Forward
+// Variation C, Terminal / Monospace Forward
 // Feels like a TUI. ASCII dividers, status-bar footer, inline everything.
 // Phosphor-green on deep background with a secondary magenta accent.
 
@@ -50,11 +50,11 @@ function VariationC() {
         {/* ascii header */}
         <div style={{ color: themeC.accent, fontSize: 11, whiteSpace: 'pre', lineHeight: 1.15, marginBottom: 6 }}>
 {`  ╔═══════════════════════════════════════════════════════════╗
-  ║  pev — parallel execution visualizer · monad v0.4.1       ║
+  ║  pev, parallel execution visualizer · monad v0.4.1       ║
   ╚═══════════════════════════════════════════════════════════╝`}
         </div>
         <div style={{ fontSize: 11, color: themeC.muted, marginBottom: 18 }}>
-          <span style={{ color: themeC.subtle }}>//</span> is my contract killing parallelism — and why? <span style={{ color: themeC.accent }}>■</span>
+          <span style={{ color: themeC.subtle }}>//</span> is my contract killing parallelism, and why? <span style={{ color: themeC.accent }}>■</span>
         </div>
 
         {/* prompt row */}
@@ -78,7 +78,7 @@ function VariationC() {
 
         <Divider theme={themeC} label="summary" />
 
-        {/* summary — ascii table */}
+        {/* summary, ascii table */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginBottom: 14, border: `1px solid ${themeC.border}` }}>
           {[
             ['parallelism', `${window.DEMO.summary.parallelismScore}/100`, 'clean'],

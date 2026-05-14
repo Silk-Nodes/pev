@@ -2,31 +2,50 @@
   "name": "pev",
   "version": "0.1.0",
   "private": true,
-  "description": "Parallel Execution Visualizer for Monad — by Silk Nodes",
+  "description": "Parallel Execution Visualizer for Monad, by Silk Nodes",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0 -p 3003",
     "lint": "next lint",
-    "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
-    "db:status": "tsx --env-file=.env.local scripts/migrate.ts --status",
-    "indexer": "tsx --env-file=.env.local scripts/indexer.ts",
-    "indexer:backfill": "tsx --env-file=.env.local scripts/indexer.ts --backfill",
-    "probe": "tsx --env-file=.env.local scripts/probe-block.ts"
+    "db:migrate": "tsx --env-file=.env.local --env-file=.env.production.local scripts/migrate.ts",
+    "db:status": "tsx --env-file=.env.local --env-file=.env.production.local scripts/migrate.ts --status",
+    "db:analyze": "tsx --env-file=.env.local --env-file=.env.production.local scripts/db-analyze.ts",
+    "db:refresh-contract-index": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-contract-index.ts",
+    "indexer": "tsx --env-file=.env.local --env-file=.env.production.local scripts/indexer.ts",
+    "indexer:backfill": "tsx --env-file=.env.local --env-file=.env.production.local scripts/indexer.ts --backfill",
+    "analytics:refresh": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-analytics.ts",
+    "probe": "tsx --env-file=.env.local --env-file=.env.production.local scripts/probe-block.ts",
+    "deploy": "./deploy/deploy.sh",
+    "deploy:restart": "./deploy/deploy.sh --restart-only",
+    "deploy:logs:indexer": "ssh $PEV_HOST 'journalctl -u pev-indexer -f'",
+    "deploy:logs:web": "ssh $PEV_HOST 'journalctl -u pev-web -f'"
   },
   "dependencies": {
-    "next": "^15.5.15",
+    "next": "^15.5.16",
     "pg": "^8.13.0",
     "pg-boss": "^10.1.5",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.10",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0"
-  }
+  },
+  "//browserslist": "Tightens our target browsers to recent versions only, which lets Next.js / SWC skip transpiling modern syntax (optional chaining, nullish coalescing, native async/await, etc.) down to legacy equivalents. Drops ~12 KiB of legacy JS shims from the production bundle per Lighthouse's audit, ~40-80 ms TBT win on mobile. Audience is Monad devs; all evergreen browsers from 2021+ are supported, which covers >99% of dev traffic.",
+  "browserslist": [
+    "chrome >= 90",
+    "firefox >= 88",
+    "safari >= 14",
+    "edge >= 90",
+    "not ie 11",
+    "not op_mini all",
+    "not dead"
+  ]
 }

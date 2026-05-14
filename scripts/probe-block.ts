@@ -1,5 +1,5 @@
 /**
- * probe-block.ts — Phase 1 feasibility spike for the Monad Parallel Execution Visualizer.
+ * probe-block.ts, Phase 1 feasibility spike for the Monad Parallel Execution Visualizer.
  *
  * For a given block number, this script:
  *   1. Fetches the block via eth_getBlockByNumber
@@ -65,9 +65,9 @@ interface PrestateDiff {
 interface TxAccess {
   hash: Hex;
   position: number;
-  /** "{contract}:{slot}" — set of slots read */
+  /** "{contract}:{slot}", set of slots read */
   reads: Set<string>;
-  /** "{contract}:{slot}" — set of slots written */
+  /** "{contract}:{slot}", set of slots written */
   writes: Set<string>;
   contracts: Set<Hex>;
 }
@@ -405,7 +405,7 @@ async function main() {
   if (args.pretty) {
     console.log(formatPretty(probe));
   } else {
-    // Replace Set instances aren't here — already converted. Stringify directly.
+    // Replace Set instances aren't here, already converted. Stringify directly.
     console.log(JSON.stringify(probe, null, 2));
   }
 }

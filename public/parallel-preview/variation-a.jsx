@@ -1,4 +1,4 @@
-// Variation A — Editorial Technical
+// Variation A, Editorial Technical
 // Refined type, generous whitespace, quiet chrome, a single confident accent.
 // Body: Söhne-ish (use Inter Tight as web fallback) · Display: Fraktion-ish serif (use Instrument Serif)
 // Dark cream on near-black. Warm ember accent.

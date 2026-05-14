@@ -1,7 +1,7 @@
 /**
- * pev theme — token set per the PEV Brand Book v1.0 (Chapter 04 · Color).
+ * pev theme, token set per the PEV Brand Book v1.0 (Chapter 04 · Color).
  *
- * Mirrors values defined in parallel.css as CSS variables — duplicated here
+ * Mirrors values defined in parallel.css as CSS variables, duplicated here
  * as TypeScript constants for inline-style usage in components that need
  * computed colors (SVG fills, conditional backgrounds, gradient stops).
  *
@@ -41,7 +41,10 @@ export const themeA = {
   laneAlt: "rgba(240,230,210,0.02)",
   text: "#efe7d4",
   muted: "#8a8577",
-  subtle: "#5c5749",
+  // Bumped from #5c5749 to #827b6c for WCAG AA contrast on dark ink.
+  // Kept in sync with --pev-subtle in globals.css. Still reads quieter
+  // than muted (#8a8577) so the text > muted > subtle hierarchy holds.
+  subtle: "#827b6c",
   dim: "#2a2822",
   accent: "#e28c52",
   onAccent: "#1a0f08",
@@ -53,11 +56,11 @@ export const themeA = {
   radius: 3,
   reexecStripe: "rgba(10,8,6,0.55)",
   status: {
-    /** wave 0 + no inbound conflicts — fully parallel-safe */
+    /** wave 0 + no inbound conflicts, fully parallel-safe */
     clean: "#a8c487",
-    /** wave > 0 — forced to wait for an earlier conflicting tx */
+    /** wave > 0, forced to wait for an earlier conflicting tx */
     delayed: "#d4a94a",
-    /** has outbound conflicts — this tx blocked others */
+    /** has outbound conflicts, this tx blocked others */
     source: "#c8553d",
   },
   mono: 'var(--font-pev-mono), "JetBrains Mono", ui-monospace, monospace',
