@@ -17,12 +17,15 @@ export default function SummaryMetrics() {
   const { data } = usePEV();
   const { summary } = data;
 
+  // sourceText (lighter terracotta) instead of source, because these
+  // colors are rendered as the metric number text on the dark surface,
+  // not as fills. source would fail WCAG AA (~4.28:1 on panel).
   const parallelismColor =
     summary.parallelismScore > 70
       ? themeA.status.clean
       : summary.parallelismScore > 40
         ? themeA.status.delayed
-        : themeA.status.source;
+        : themeA.status.sourceText;
 
   const items: Array<{ label: string; value: string; unit?: string; color: string }> = [
     {
@@ -35,7 +38,7 @@ export default function SummaryMetrics() {
       label: "Blocked",
       value: String(summary.blockedPct),
       unit: "%",
-      color: summary.blockedPct > 0 ? themeA.status.source : themeA.text,
+      color: summary.blockedPct > 0 ? themeA.status.sourceText : themeA.text,
     },
     {
       label: "Avg conflicts / tx",

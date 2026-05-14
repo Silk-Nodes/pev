@@ -158,7 +158,7 @@ export default function SubmitForm() {
           fontSize: 10,
           color:
             titleLen > TITLE_MAX
-              ? themeA.status.source
+              ? themeA.status.sourceText
               : titleOk
                 ? themeA.muted
                 : themeA.subtle,
@@ -206,7 +206,7 @@ export default function SubmitForm() {
       <div
         style={{
           fontSize: 10,
-          color: description.length > DESC_MAX ? themeA.status.source : themeA.subtle,
+          color: description.length > DESC_MAX ? themeA.status.sourceText : themeA.subtle,
           fontFamily: themeA.mono,
           marginBottom: 16,
         }}
