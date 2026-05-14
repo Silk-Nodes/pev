@@ -72,22 +72,24 @@ const nextConfig: NextConfig = {
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     ];
+    // Order matters: when two header rules match the same path with the
+    // same key, the LATER rule wins. So we set the public-index policy
+    // on the catch-all first, then override with noindex for /api/*.
+    // (Reversed order would make every /api/* response advertise itself
+    // as indexable, which we explicitly don't want for raw JSON.)
     return [
+      {
+        source: "/:path*",
+        headers: [
+          ...securityHeaders,
+          { key: "X-Robots-Tag", value: "index, follow, max-image-preview:large" },
+        ],
+      },
       {
         source: "/api/:path*",
         headers: [
           ...securityHeaders,
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
-        ],
-      },
-      {
-        // Match every non-API route. Next.js applies rules in source
-        // order with more-specific patterns winning, so the /api/*
-        // rule above takes precedence for those paths.
-        source: "/:path*",
-        headers: [
-          ...securityHeaders,
-          { key: "X-Robots-Tag", value: "index, follow, max-image-preview:large" },
         ],
       },
     ];
