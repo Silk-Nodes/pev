@@ -21,8 +21,11 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
 
 ## [Unreleased]
 
-Nothing yet. Add bullets here as work lands on `main`; the next release
-will move them into a dated version section.
+### Added
+
+- `CHANGELOG.md` (this file) as the canonical record of changes.
+- `deploy/RELEASING.md`: step-by-step runbook for cutting a new release.
+- Pointer in `CONTRIBUTING.md` linking maintainers to the release flow.
 
 ## [0.1.0] - 2026-05-14
 
