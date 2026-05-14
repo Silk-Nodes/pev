@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * migrate.ts — applies SQL migrations from db/migrations/ in lexicographic
+ * migrate.ts, applies SQL migrations from db/migrations/ in lexicographic
  * order. Each file is applied at most once (tracked in schema_migrations).
  *
  * Usage:
@@ -13,7 +13,7 @@
  *      itself, but the runner doesn't require it).
  *   3. The runner records (filename, sha256) in schema_migrations on success.
  *   4. 002_timescale.sql is SKIPPED if the timescaledb extension is not
- *      available — the warning is logged.
+ *      available, the warning is logged.
  *
  * On a fresh database the runner creates the schema_migrations table
  * implicitly (it's created by 001_initial.sql).
@@ -41,7 +41,7 @@ interface Migration {
 function loadMigrations(): Migration[] {
   const files = readdirSync(MIGRATIONS_DIR)
     .filter((f) => f.endsWith(".sql"))
-    .sort(); // lexicographic order — relies on numbered prefixes (001_, 002_, …)
+    .sort(); // lexicographic order, relies on numbered prefixes (001_, 002_, …)
 
   return files.map((filename) => {
     const sql = readFileSync(join(MIGRATIONS_DIR, filename), "utf8");
@@ -53,7 +53,7 @@ function loadMigrations(): Migration[] {
 
 async function getApplied(): Promise<Map<string, string>> {
   // Bootstrap: if schema_migrations doesn't exist yet (first run), nothing
-  // is applied. We catch the error rather than pre-checking — saves a query.
+  // is applied. We catch the error rather than pre-checking, saves a query.
   try {
     const rows = await queryRows<{ filename: string; checksum: string }>(
       "SELECT filename, checksum FROM schema_migrations",
@@ -61,7 +61,7 @@ async function getApplied(): Promise<Map<string, string>> {
     return new Map(rows.map((r) => [r.filename, r.checksum]));
   } catch (err) {
     if ((err as { code?: string }).code === "42P01") {
-      // undefined_table — normal on first run
+      // undefined_table, normal on first run
       return new Map();
     }
     throw err;

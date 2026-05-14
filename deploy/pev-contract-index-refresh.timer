@@ -1,0 +1,26 @@
+[Unit]
+Description=pev, fire pev-contract-index-refresh.service every 15 minutes
+
+[Timer]
+# Initial run: 90s after boot, lets the indexer catch up first so the
+# first refresh covers everything written since the previous shutdown.
+OnBootSec=90s
+
+# Refresh every 15 minutes (measured from when the previous run finished
+# so the heavy unnest+GROUP BY can never overlap itself).
+#
+# 15 min was chosen instead of the 5 min that analytics_cache uses
+# because: (a) the contract_index refresh is heavier, and (b) point
+# lookups for "is this contract here?" are robust to 15-min staleness.
+# A user looking up a brand-new contract may wait one tick for it to
+# show up. Acceptable trade.
+OnUnitInactiveSec=15min
+
+# If the host was off, run once at boot instead of waiting for the
+# next 15-minute boundary. Catches up to recent indexer activity.
+Persistent=true
+
+Unit=pev-contract-index-refresh.service
+
+[Install]
+WantedBy=timers.target

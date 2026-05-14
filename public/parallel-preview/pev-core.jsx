@@ -349,7 +349,7 @@ function ConflictGraph({ theme, height = 280 }) {
         })}
       </svg>
       <div style={{ position: 'absolute', top: 8, right: 10, fontFamily: theme.mono, fontSize: 9, color: theme.subtle, display: 'flex', gap: 10 }}>
-        <span>— write/write</span>
+        <span>, write/write</span>
         <span>- - read/write</span>
       </div>
     </div>

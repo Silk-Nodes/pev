@@ -1,5 +1,5 @@
 
-// DesignCanvas.jsx — Figma-ish design canvas wrapper
+// DesignCanvas.jsx, Figma-ish design canvas wrapper
 // Warm gray grid bg + Sections + Artboards + PostIt notes.
 // Artboards are reorderable (grip-drag), labels/titles are inline-editable,
 // and any artboard can be opened in a fullscreen focus overlay (←/→/Esc).
@@ -57,13 +57,13 @@ if (typeof document !== 'undefined' && !document.getElementById('dc-styles')) {
 const DCCtx = React.createContext(null);
 
 // ─────────────────────────────────────────────────────────────
-// DesignCanvas — stateful wrapper around the pan/zoom viewport.
+// DesignCanvas, stateful wrapper around the pan/zoom viewport.
 // Owns runtime state (per-section order, renamed titles/labels, focused
 // artboard). Order/titles/labels persist to a .design-canvas.state.json
 // sidecar next to the HTML. Reads go via plain fetch() so the saved
 // arrangement is visible anywhere the HTML + sidecar are served together
 // (omelette preview, direct link, downloaded zip). Writes go through the
-// host's window.omelette bridge — editing requires the omelette runtime.
+// host's window.omelette bridge, editing requires the omelette runtime.
 // Focus is ephemeral.
 // ─────────────────────────────────────────────────────────────
 const DC_STATE_FILE = '.design-canvas.state.json';
@@ -105,7 +105,7 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
 
   // Build registries synchronously from children so FocusOverlay can read
   // them in the same render. Only direct DCSection > DCArtboard children are
-  // walked — wrapping them in other elements opts out of focus/reorder.
+  // walked, wrapping them in other elements opts out of focus/reorder.
   const registry = {};     // slotId -> { sectionId, artboard }
   const sectionMeta = {};  // sectionId -> { title, subtitle, slotIds[] }
   const sectionOrder = [];
@@ -167,7 +167,7 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// DCViewport — transform-based pan/zoom (internal)
+// DCViewport, transform-based pan/zoom (internal)
 //
 // Input mapping (Figma-style):
 //   • trackpad pinch  → zoom   (ctrlKey wheel; Safari gesture* events)
@@ -176,7 +176,7 @@ function DesignCanvas({ children, minScale, maxScale, style }) {
 //   • middle-drag / primary-drag-on-bg → pan
 //
 // Transform state lives in a ref and is written straight to the DOM
-// (translate3d + will-change) so wheel ticks don't go through React —
+// (translate3d + will-change) so wheel ticks don't go through React,
 // keeps pans at 60fps on dense canvases.
 // ─────────────────────────────────────────────────────────────
 function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
@@ -218,15 +218,15 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
 
     const onWheel = (e) => {
       e.preventDefault();
-      if (isGesturing) return; // Safari: gesture* owns the pinch — discard concurrent wheels
+      if (isGesturing) return; // Safari: gesture* owns the pinch, discard concurrent wheels
       if (e.ctrlKey) {
         // trackpad pinch (or explicit ctrl+wheel)
         zoomAt(e.clientX, e.clientY, Math.exp(-e.deltaY * 0.01));
       } else if (isMouseWheel(e)) {
-        // notched mouse wheel — fixed-ratio step per click
+        // notched mouse wheel, fixed-ratio step per click
         zoomAt(e.clientX, e.clientY, Math.exp(-Math.sign(e.deltaY) * 0.18));
       } else {
-        // trackpad two-finger scroll — pan
+        // trackpad two-finger scroll, pan
         tf.current.x -= e.deltaX;
         tf.current.y -= e.deltaY;
         apply();
@@ -236,7 +236,7 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
     // Safari sends native gesture* events for trackpad pinch with a smooth
     // e.scale; preferring these over the ctrl+wheel fallback gives a much
     // better feel there. No-ops on other browsers. Safari also fires
-    // ctrlKey wheel events during the same pinch — isGesturing makes
+    // ctrlKey wheel events during the same pinch, isGesturing makes
     // onWheel drop those entirely so they neither zoom nor pan.
     let gsBase = 1;
     let isGesturing = false;
@@ -328,7 +328,7 @@ function DCViewport({ children, minScale = 0.1, maxScale = 8, style = {} }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// DCSection — editable title + h-row of artboards in persisted order
+// DCSection, editable title + h-row of artboards in persisted order
 // ─────────────────────────────────────────────────────────────
 function DCSection({ id, title, subtitle, children, gap = 48 }) {
   const ctx = React.useContext(DCCtx);
@@ -368,7 +368,7 @@ function DCSection({ id, title, subtitle, children, gap = 48 }) {
   );
 }
 
-// DCArtboard — marker; rendered by DCArtboardFrame via DCSection.
+// DCArtboard, marker; rendered by DCArtboardFrame via DCSection.
 function DCArtboard() { return null; }
 
 function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorder, onFocus }) {
@@ -383,7 +383,7 @@ function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorde
     e.preventDefault(); e.stopPropagation();
     const me = ref.current;
     // translateX is applied in local (pre-scale) space but pointer deltas and
-    // getBoundingClientRect().left are screen-space — divide by the viewport's
+    // getBoundingClientRect().left are screen-space, divide by the viewport's
     // current scale so the dragged card tracks the cursor at any zoom level.
     const scale = me.getBoundingClientRect().width / me.offsetWidth || 1;
     const peers = Array.from(document.querySelectorAll(`[data-dc-section="${sectionId}"] [data-dc-slot]`));
@@ -460,7 +460,7 @@ function DCArtboardFrame({ sectionId, artboard, label, order, onRename, onReorde
   );
 }
 
-// Inline rename — commits on blur or Enter.
+// Inline rename, commits on blur or Enter.
 function DCEditable({ value, onChange, style, tag = 'span', onClick }) {
   const T = tag;
   return (
@@ -474,7 +474,7 @@ function DCEditable({ value, onChange, style, tag = 'span', onClick }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Focus mode — overlay one artboard; ←/→ within section, ↑/↓ across
+// Focus mode, overlay one artboard; ←/→ within section, ↑/↓ across
 // sections, Esc or backdrop click to exit.
 // ─────────────────────────────────────────────────────────────
 function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
@@ -567,7 +567,7 @@ function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
             borderRadius: 16, fontSize: 20, cursor: 'pointer', lineHeight: 1, transition: 'background .12s' }}>×</button>
       </div>
 
-      {/* card centered, label + index below — only the card itself stops
+      {/* card centered, label + index below, only the card itself stops
           propagation so any backdrop click (including the margins around
           the card) exits focus */}
       <div
@@ -602,7 +602,7 @@ function DCFocusOverlay({ entry, sectionMeta, sectionOrder }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// Post-it — absolute-positioned sticky note
+// Post-it, absolute-positioned sticky note
 // ─────────────────────────────────────────────────────────────
 function DCPostIt({ children, top, left, right, bottom, rotate = -2, width = 180 }) {
   return (

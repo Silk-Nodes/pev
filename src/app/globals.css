@@ -1,5 +1,5 @@
 /*
- * pev — global styles. Tokens per PEV Brand Book v1.0 (Ch. 04 · Color).
+ * pev, global styles. Tokens per PEV Brand Book v1.0 (Ch. 04 · Color).
  * Single-purpose app; styles apply globally without a wrapper class.
  */
 
@@ -38,7 +38,12 @@
   --pev-alt-bg:     var(--pev-surface-03);
   --pev-text:       var(--pev-bone);
   --pev-muted:      var(--pev-stone);
-  --pev-subtle:     #5c5749;
+  /* Bumped from #5c5749 (2.67:1 on ink, fails WCAG AA) to #827b6c
+     (~4.63:1, passes AA for normal text). Still reads quieter than
+     --pev-muted (#8a8577 ≈ 5.56:1) so the visual hierarchy of
+     text > muted > subtle stays intact, just every tier is now
+     readable per accessibility standards. */
+  --pev-subtle:     #827b6c;
   --pev-dim:        #2a2822;
   --pev-accent:     var(--pev-ember);
   --pev-on-accent:  #1a0f08;
@@ -87,10 +92,69 @@ body {
 
 /* ─── Editorial primitives reused by components ───────────────── */
 
+/* ─── Responsive grid utilities ──────────────────────────────────
+ *
+ * Server Components use inline styles for layout, which means we can't
+ * easily use media queries. These utility classes break out the
+ * responsive grid cases so the same JSX renders 4-up on desktop, 2-up
+ * on tablet, and 1-up on phone without per-component breakpoint logic.
+ *
+ * Used by /contract/[address], /block/[number], and SummaryMetrics.
+ * Heights and gaps stay declarative inline; only the column count
+ * collapses by breakpoint.
+ *
+ * Breakpoint choices:
+ *   • 720px ≈ small tablet / large phone landscape
+ *   • 480px ≈ portrait phone
+ */
+
+.pev-grid-stats-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 720px) {
+  .pev-grid-stats-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 420px) {
+  .pev-grid-stats-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pev-grid-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 720px) {
+  .pev-grid-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Used by the block-page hero summary (1.1fr / 1fr): collapses cleanly
+ * to a single column on narrow viewports so neither half gets squeezed
+ * below a usable width.
+ */
+.pev-grid-hero {
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+}
+@media (max-width: 720px) {
+  .pev-grid-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
 .pev-eyebrow {
   font-family: var(--pev-font-mono);
   font-size: 10px;
-  color: var(--pev-subtle);
+  /* Bumped from --pev-subtle (#5c5749) to --pev-muted (#8a8577). The
+     eyebrow is a section label, structurally important. It should
+     read at a glance against the dark background. The previous color
+     was barely visible on #0e0d0b. */
+  color: var(--pev-muted);
   text-transform: uppercase;
   letter-spacing: 0.15em;
 }
@@ -113,7 +177,7 @@ body {
 
 .pev-mono { font-family: var(--pev-font-mono); }
 
-/* Stripe pattern — used to mark conflict-source txs */
+/* Stripe pattern, used to mark conflict-source txs */
 .pev-stripe-source {
   background-image: repeating-linear-gradient(
     135deg,
@@ -124,9 +188,53 @@ body {
   );
 }
 
-/* Brand Book hero — warm radial glow at top-right of the cover page */
+/* Brand Book hero, warm radial glow at top-right of the cover page */
 .pev-cover-glow {
   background:
     radial-gradient(ellipse at 70% 30%, rgba(226, 140, 82, 0.12), transparent 60%),
     var(--pev-ink);
+}
+
+/* Soft pulse for the "● live" SSE status pill */
+@keyframes pev-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+
+/* Floating FeedbackPill in the bottom-left. Hidden on narrow viewports
+ * where it would collide with primary content; the SiteFooter has a
+ * Feedback link so mobile users still reach /feedback by scrolling. */
+.pev-feedback-pill {
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.pev-feedback-pill:hover {
+  background: var(--pev-surface-02) !important;
+  border-color: var(--pev-line-strong) !important;
+}
+@media (max-width: 720px) {
+  .pev-feedback-pill {
+    display: none !important;
+  }
+}
+
+/* Brief warm-text glow on each new chain head, re-triggered per tick by
+   re-mounting the span (`key={headFlashKey}` in LiveStatus). Subtle on
+   purpose: makes the tick visible without being a visual nag. */
+@keyframes pev-head-flash {
+  0%   { color: var(--pev-amber); text-shadow: 0 0 8px rgba(212, 169, 74, 0.45); }
+  60%  { color: var(--pev-amber); text-shadow: 0 0 4px rgba(212, 169, 74, 0.20); }
+  100% { color: var(--pev-text);  text-shadow: none; }
+}
+
+/* Bottleneck-contract chip under the search, borrows the chip pattern
+   used elsewhere in the editorial UI but with a warm border on hover so
+   it reads as "click to investigate this offender" rather than passive. */
+.pev-chip-bottleneck:hover {
+  border-color: var(--pev-amber) !important;
+}
+
+/* Killer leaderboard rows on /analytics, subtle warm tint on hover so
+   the rows read as click targets without becoming buttons. */
+.pev-row-killer:hover {
+  background: rgba(226, 140, 82, 0.06) !important;
 }

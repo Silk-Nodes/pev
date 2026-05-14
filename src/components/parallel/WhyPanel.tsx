@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * WhyPanel — explains, in plain language, why the selected tx is in the
+ * WhyPanel, explains, in plain language, why the selected tx is in the
  * wave it's in. Shows:
  *   - status badge (parallel / delayed / blocks others)
  *   - inbound conflicts: which earlier txs forced this one to wait, and on
@@ -12,7 +12,7 @@
  *
  * Note: the original variation-a's WhyPanel had a hand-tuned "Suggestion"
  * paragraph based on contract name (Pool, Comptroller, etc). We don't have
- * decoded contract names yet — until 4byte/Sourcify wiring lands, the
+ * decoded contract names yet, until 4byte/Sourcify wiring lands, the
  * suggestion is omitted rather than faked.
  */
 
@@ -47,7 +47,7 @@ export default function WhyPanel() {
           What's blocking what?
         </div>
         Click any transaction in the timeline or graph to see which storage
-        slots forced it to wait — and which later transactions it blocked.
+        slots forced it to wait, and which later transactions it blocked.
       </div>
     );
   }
@@ -118,7 +118,7 @@ export default function WhyPanel() {
                   key={i}
                   left={c.sharedSlots[0] ?? ""}
                   middle={KIND_LABEL[c.kind]}
-                  right={`vs ${other?.id ?? c.fromId} (${other?.contractLabel ?? "—"})`}
+                  right={`vs ${other?.id ?? c.fromId} (${other?.contractLabel ?? "-"})`}
                   extra={c.sharedSlots.length > 1 ? `+${c.sharedSlots.length - 1} more slot${c.sharedSlots.length - 1 === 1 ? "" : "s"}` : undefined}
                 />
               );
@@ -135,7 +135,7 @@ export default function WhyPanel() {
                   key={i}
                   left={c.sharedSlots[0] ?? ""}
                   middle={KIND_LABEL[c.kind]}
-                  right={`→ ${other?.id ?? c.toId} (${other?.contractLabel ?? "—"})`}
+                  right={`→ ${other?.id ?? c.toId} (${other?.contractLabel ?? "-"})`}
                   extra={c.sharedSlots.length > 1 ? `+${c.sharedSlots.length - 1} more slot${c.sharedSlots.length - 1 === 1 ? "" : "s"}` : undefined}
                 />
               );
@@ -145,7 +145,7 @@ export default function WhyPanel() {
 
         {tx.status === "clean" && (
           <div style={{ color: themeA.muted, fontSize: 12 }}>
-            This tx ran in parallel wave 0 with no detected storage conflicts —
+            This tx ran in parallel wave 0 with no detected storage conflicts -
             it neither waited for nor blocked any other tx in this block.
           </div>
         )}

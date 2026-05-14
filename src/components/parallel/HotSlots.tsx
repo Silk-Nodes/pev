@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * HotSlots — contention ranking. Shows the top N storage slots that were
+ * HotSlots, contention ranking. Shows the top N storage slots that were
  * touched by multiple txs in this block, sorted by touch count.
  *
  * When a tx is selected, slots NOT touched by that tx fade to ~40% opacity,
@@ -26,7 +26,7 @@ export default function HotSlots({ limit = 8 }: Props) {
   const { data, selected, txById, conflictsByTx } = usePEV();
   const { hotSlots } = data;
 
-  // Slots touched by the selected tx — derived from its conflict edges
+  // Slots touched by the selected tx, derived from its conflict edges
   const selectedSlotSet = new Set<string>();
   if (selected) {
     const tx = txById.get(selected);
@@ -40,7 +40,7 @@ export default function HotSlots({ limit = 8 }: Props) {
   if (hotSlots.length === 0) {
     return (
       <div style={{ padding: "20px 0", color: themeA.muted, fontFamily: themeA.mono, fontSize: 12 }}>
-        No hot slots — every storage slot in this block was touched by at most one tx.
+        No hot slots, every storage slot in this block was touched by at most one tx.
       </div>
     );
   }

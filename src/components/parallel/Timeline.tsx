@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Timeline — gantt-style wave visualization, ported from variation-a's Timeline.
+ * Timeline, gantt-style wave visualization, ported from variation-a's Timeline.
  *
  * Adaptations from the original (decided in design review):
  *   - "thread t0..t4" → "wave 0..N" (forced execution rounds, not physical threads)
@@ -16,7 +16,8 @@
  *   - selecting dims unrelated txs to ~28% opacity
  */
 
-import { usePEV } from "./PEVContext";
+import { useEffect } from "react";
+import { usePEV, type PEVMode } from "./PEVContext";
 import { themeA } from "./theme";
 import type { PEVTx } from "@/lib/probe-to-pev";
 
@@ -26,12 +27,59 @@ interface Props {
   laneLabelWidth?: number;
 }
 
+/**
+ * Per-cell visual encoding for a given mode. The same Timeline structure
+ * (waves × txs) is repainted three ways so the user can flip between
+ * facets of the same data without losing position context.
+ *
+ *   execution , status-driven (clean / delayed / source-with-stripes).
+ *                Default; matches the live-feed colour vocabulary.
+ *   conflict  , conflict-count gradient. Clean txs (zero conflicts) are
+ *                dimmed so the eye lands on the contended ones first.
+ *                Stripes appear on any tx that BLOCKED others (the cause).
+ *   heatmap   , storage-I/O weight (reads + writes). Cool→hot gradient.
+ *                Useful for spotting "fat" txs that touch many slots.
+ */
+function fillFor(
+  tx: PEVTx,
+  mode: PEVMode,
+  dim: boolean,
+): { bg: string; striped: boolean } {
+  if (dim) return { bg: themeA.dim, striped: false };
+
+  if (mode === "conflict") {
+    const total = tx.inboundConflicts + tx.outboundConflicts;
+    if (total === 0) return { bg: themeA.dim, striped: false };
+    if (total <= 2) return { bg: themeA.status.delayed, striped: false };
+    // Heavy conflict involvement → red, with stripes if this tx CAUSED it
+    return {
+      bg: themeA.status.source,
+      striped: tx.outboundConflicts > 0,
+    };
+  }
+
+  if (mode === "heatmap") {
+    const ops = tx.readCount + tx.writeCount;
+    if (ops === 0) return { bg: themeA.dim, striped: false };
+    if (ops < 5) return { bg: themeA.status.clean, striped: false };
+    if (ops < 20) return { bg: themeA.status.delayed, striped: false };
+    if (ops < 60) return { bg: themeA.accent, striped: false }; // ember
+    return { bg: themeA.status.source, striped: false };
+  }
+
+  // execution (default)
+  if (tx.status === "source") return { bg: themeA.status.source, striped: true };
+  if (tx.status === "delayed") return { bg: themeA.status.delayed, striped: false };
+  return { bg: themeA.status.clean, striped: false };
+}
+
 export default function Timeline({
   height = 320,
   showLaneLabels = true,
   laneLabelWidth = 96,
 }: Props) {
-  const { data, selected, setSelected, hover, setHover, neighborsOf } = usePEV();
+  const { data, selected, setSelected, hover, setHover, mode, neighborsOf } =
+    usePEV();
   const { waveTxs, summary } = data;
 
   const related = selected ? neighborsOf(selected) : null;
@@ -40,17 +88,25 @@ export default function Timeline({
   // Lane height auto-fits within the requested height, with sane bounds
   const laneH = Math.max(36, Math.min(64, Math.floor((height - 40) / Math.max(1, waveCount))));
 
-  // Color for a tx based on status. Stripe pattern is applied via className.
-  const fillFor = (tx: PEVTx, dim: boolean): string => {
-    if (dim) return themeA.dim;
-    if (tx.status === "source") return themeA.status.source;
-    if (tx.status === "delayed") return themeA.status.delayed;
-    return themeA.status.clean;
-  };
+  // Esc-to-deselect, universal "get me out of focus mode" shortcut.
+  // Only attaches a listener while something is selected so we don't pay
+  // for it on every page render.
+  useEffect(() => {
+    if (!selected) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelected(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected, setSelected]);
 
   return (
     <div style={{ width: "100%", userSelect: "none" }}>
-      {/* Header: block stats, no zoom controls (no ms timing to zoom) */}
+      {/* Header: block stats + a visible "clear selection" pill that only
+          shows up when a tx is focused. Three ways to deselect:
+            1. Click this pill
+            2. Press Escape
+            3. Click empty space in a wave row */}
       <div
         style={{
           display: "flex",
@@ -68,6 +124,27 @@ export default function Timeline({
           {summary.txCount} txs across {summary.waves} wave{summary.waves === 1 ? "" : "s"}
           {"  ·  "}depth {summary.longestChain}
         </div>
+        {selected && (
+          <button
+            type="button"
+            onClick={() => setSelected(null)}
+            title="Clear selection (Esc)"
+            style={{
+              background: "transparent",
+              border: `1px solid ${themeA.accent}`,
+              color: themeA.accent,
+              borderRadius: themeA.radius,
+              padding: "2px 10px",
+              fontSize: 10,
+              fontFamily: themeA.mono,
+              cursor: "pointer",
+              letterSpacing: ".05em",
+              textTransform: "uppercase",
+            }}
+          >
+            ✕ clear · esc
+          </button>
+        )}
         <div style={{ color: themeA.subtle }}>parallel ↔ serial</div>
       </div>
 
@@ -96,8 +173,20 @@ export default function Timeline({
           </div>
         )}
 
-        {/* Track area: each row is a wave, txs span the row at equal width */}
-        <div style={{ flex: 1, position: "relative", minWidth: 0 }}>
+        {/* Track area: each row is a wave, txs span the row at equal width.
+            Clicking the EMPTY space within a row (not on a tx button) clears
+            the selection, third "deselect" affordance alongside Esc and the
+            "✕ clear" pill in the header. */}
+        <div
+          style={{ flex: 1, position: "relative", minWidth: 0 }}
+          onClick={(e) => {
+            // Only deselect if the click landed on the row background, not
+            // on a tx button (buttons have their own onClick that selects)
+            if (selected && (e.target as HTMLElement).tagName !== "BUTTON") {
+              setSelected(null);
+            }
+          }}
+        >
           {waveTxs.map((wave, wIdx) => {
             const cellWidth = wave.length > 0 ? `calc(${100 / wave.length}% - ${(wave.length - 1) * 2 / wave.length}px)` : "100%";
             return (
@@ -112,6 +201,7 @@ export default function Timeline({
                   gap: 2,
                   padding: "4px 8px",
                   position: "relative",
+                  cursor: selected ? "pointer" : "default",
                 }}
               >
                 {wave.length === 0 ? (
@@ -123,8 +213,16 @@ export default function Timeline({
                     const isSelected = selected === tx.id;
                     const isRelated = related && related.has(tx.id);
                     const dim = !!selected && !isSelected && !isRelated;
-                    const isStriped = tx.status === "source";
-                    const color = fillFor(tx, dim);
+                    // Mode-aware fill: changes the cell colour vocabulary
+                    // every time the user flips the ModeToggle.
+                    const { bg: color, striped } = fillFor(tx, mode, dim);
+                    // Display label priority: decoded method name > selector hex > tx hash short
+                    // Method names are humanized: "transfer(address,uint256)" → "transfer"
+                    const methodShort = tx.method
+                      ? tx.method.split("(")[0]
+                      : tx.selector
+                        ? tx.selector
+                        : null;
                     return (
                       <button
                         key={tx.id}
@@ -132,12 +230,12 @@ export default function Timeline({
                         onMouseEnter={() => setHover(tx.id)}
                         onMouseLeave={() => setHover(null)}
                         onClick={() => setSelected(isSelected ? null : tx.id)}
-                        title={`tx #${tx.position} · ${tx.label}\nreads ${tx.readCount} writes ${tx.writeCount}\nblocks ${tx.outboundConflicts} · waits on ${tx.inboundConflicts}`}
+                        title={`tx #${tx.position} · ${tx.label}${tx.method ? `\nmethod ${tx.method}` : tx.selector ? `\nselector ${tx.selector}` : ""}${tx.contractName ? `\ncontract ${tx.contractName}` : ""}\nreads ${tx.readCount} writes ${tx.writeCount}\nblocks ${tx.outboundConflicts} · waits on ${tx.inboundConflicts}`}
                         style={{
                           flex: `1 1 ${cellWidth}`,
                           minWidth: 36,
                           height: laneH - 14,
-                          background: isStriped
+                          background: striped
                             ? `repeating-linear-gradient(135deg, ${color}, ${color} 4px, ${themeA.reexecStripe} 4px, ${themeA.reexecStripe} 8px)`
                             : color,
                           border: isSelected
@@ -150,7 +248,12 @@ export default function Timeline({
                           opacity: dim ? 0.28 : 1,
                           cursor: "pointer",
                           padding: "0 8px",
-                          color: themeA.onBlock,
+                          // Striped cells alternate dark stripes over a coloured base,
+                          // so dark `onBlock` text disappears into the stripe bands.
+                          // Switch to bone (themeA.text) with a soft dark shadow so
+                          // text reads on both the coloured base and the stripe bands.
+                          color: striped ? themeA.text : themeA.onBlock,
+                          textShadow: striped ? "0 1px 1px rgba(0,0,0,0.55)" : "none",
                           fontFamily: themeA.mono,
                           fontSize: 10,
                           fontWeight: 500,
@@ -163,7 +266,11 @@ export default function Timeline({
                       >
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
                           <span style={{ opacity: 0.6 }}>#{tx.position}</span>
-                          <span>{tx.label}</span>
+                          {methodShort ? (
+                            <span style={{ fontWeight: 600 }}>{methodShort}</span>
+                          ) : (
+                            <span>{tx.label}</span>
+                          )}
                           {tx.outboundConflicts > 0 && (
                             <span style={{ opacity: 0.85 }}>· blocks {tx.outboundConflicts}</span>
                           )}
@@ -225,6 +332,24 @@ function TxTooltip({ txId }: { txId: string }) {
       <span>
         <span style={{ color: themeA.subtle }}>tx</span> {tx.label}
       </span>
+      {tx.method ? (
+        <span>
+          <span style={{ color: themeA.subtle }}>fn</span>{" "}
+          <span style={{ color: themeA.accent }}>{tx.method.split("(")[0]}</span>
+        </span>
+      ) : tx.selector ? (
+        <span>
+          <span style={{ color: themeA.subtle }}>sel</span> {tx.selector}
+        </span>
+      ) : null}
+      {tx.contractName && (
+        <span>
+          <span style={{ color: themeA.subtle }}>on</span>{" "}
+          <span style={{ fontFamily: themeA.serif, fontStyle: "italic" }}>
+            {tx.contractName}
+          </span>
+        </span>
+      )}
       <span>
         <span style={{ color: themeA.subtle }}>r/w</span> {tx.readCount}/{tx.writeCount}
       </span>

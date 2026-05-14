@@ -1,0 +1,23 @@
+[Unit]
+Description=pev, fire pev-analytics-refresh.service every 5 minutes
+
+[Timer]
+# Wait 60s after boot before the first run, gives postgres + the
+# indexer time to come up.
+OnBootSec=60s
+
+# Repeat every 5 minutes thereafter (timed from when the previous run
+# finished, not from the previous start; avoids overlap if a refresh
+# runs long).
+OnUnitInactiveSec=5min
+
+# Persistent state: if the VM was off for hours, run once at boot
+# instead of waiting for the next 5-minute boundary. The cache might
+# be very stale at that point, we want to catch up.
+Persistent=true
+
+# Anchor the timer so the systemd graph shows it cleanly.
+Unit=pev-analytics-refresh.service
+
+[Install]
+WantedBy=timers.target

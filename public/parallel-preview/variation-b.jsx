@@ -1,4 +1,4 @@
-// Variation B — Devtools Profiler
+// Variation B, Devtools Profiler
 // Dense, flamegraph-inspired, information-forward. Chrome-devtools vibe.
 // Compact rows, toolbar, tabbed side panel, more metrics.
 
@@ -197,7 +197,7 @@ function HintList({ theme }) {
   const hints = [
     { sev: 'high', title: 'Pool reserves are a single-slot hotspot', body: 'wmonUSDC Pool.reserves drives 28 of 52 conflicts. Consider per-pair sharding or batching.' },
     { sev: 'med',  title: 'Comptroller markets serialize borrow/redeem', body: 'Reads on markets[wMON] block 4 txs. Cache market state per-tx, reconcile at commit.' },
-    { sev: 'low',  title: 'Router fee collector is write-heavy', body: 'Minor contention — acceptable at current volume.' },
+    { sev: 'low',  title: 'Router fee collector is write-heavy', body: 'Minor contention, acceptable at current volume.' },
   ];
   const colors = { high: theme.status.reexec, med: theme.status.delayed, low: theme.status.clean };
   return (

@@ -1,19 +1,19 @@
 /**
- * probe-to-pev.ts — adapter from our real BlockProbe (parallel-probe.ts)
+ * probe-to-pev.ts, adapter from our real BlockProbe (parallel-probe.ts)
  * to the data shape consumed by the Editorial visualization components.
  *
  * Honest data adaptations (decided in design review):
  *
  *   1. NO physical "threads/lanes". The original design (variation-a.jsx)
  *      grouped txs by physical CPU thread. Monad's RPC doesn't expose that.
- *      We group by **wave** instead — wave N = txs that must wait for at
+ *      We group by **wave** instead, wave N = txs that must wait for at
  *      least one wave-(N-1) tx. Same horizontal-row visualization, but
  *      semantically accurate.
  *
  *   2. NO ms timing. The X-axis in the original was real time. We don't
  *      have it. Instead each wave row contains its txs side-by-side at
  *      equal width. The width metaphor becomes "fraction of this wave's
- *      capacity" — wide cells = lots of parallelism, narrow = bottleneck.
+ *      capacity", wide cells = lots of parallelism, narrow = bottleneck.
  *
  *   3. NO "re-executed" status with retry counts. We can't measure how
  *      many times Monad's scheduler re-ran a tx. We replace the diagonal
@@ -32,7 +32,7 @@
  *   - "delayed": wave > 0 AND outboundConflicts === 0
  *                → had to wait, but didn't cascade further.
  *
- * A tx in wave > 0 that ALSO has outbound conflicts is "source" — the
+ * A tx in wave > 0 that ALSO has outbound conflicts is "source", the
  * stripe pattern dominates because that's the more important fact.
  */
 
@@ -41,7 +41,7 @@ import type { BlockProbe, ConflictKind, Hex } from "./parallel-probe";
 export type PEVStatus = "clean" | "delayed" | "source";
 
 export interface PEVTx {
-  id: string; // "tx0", "tx1"... — used as React keys + selection IDs
+  id: string; // "tx0", "tx1"..., used as React keys + selection IDs
   hash: Hex;
   position: number;
   wave: number;
@@ -51,9 +51,19 @@ export interface PEVTx {
   writeCount: number;
   inboundConflicts: number;
   outboundConflicts: number;
-  /** display label until we wire 4byte/Sourcify; for now it's shortHex */
+  /** 4-byte function selector ("0xa9059cbb"); null for plain ETH transfers */
+  selector: Hex | null;
+  /** Resolved method name (e.g. "transfer(address,uint256)") when known.
+   *  Filled in by the server-side enrichment step on the block page;
+   *  absent on raw probes. UI falls back to selector hex or short hash. */
+  method?: string | null;
+  /** Resolved primary-contract name (e.g. "wmonUSDC Pool") when known.
+   *  Filled by enrichment; absent on raw probes. UI falls back to
+   *  contractLabel (short hex). */
+  contractName?: string | null;
+  /** display label, short hash, used as a hex fallback in the UI */
   label: string;
-  /** display contract label until we wire Sourcify; first contract address shortened */
+  /** display contract label, first contract address shortened */
   contractLabel: string;
 }
 
@@ -73,9 +83,9 @@ export interface PEVHotSlot {
   touches: number;
   conflictsCaused: number;
   contention: number; // 0..1
-  /** display label — for now `shortHex(slot)` */
+  /** display label, for now `shortHex(slot)` */
   label: string;
-  /** display contract label — for now `shortHex(contract)` */
+  /** display contract label, for now `shortHex(contract)` */
   contractLabel: string;
 }
 
@@ -85,7 +95,7 @@ export interface PEVSummary {
   timestamp: number;
   txCount: number;
   statefulTxCount: number;
-  /** 0..100 — derived from parallelism factor */
+  /** 0..100, derived from parallelism factor */
   parallelismScore: number;
   /** factor from the probe (txCount / executionDepth) */
   parallelismFactor: number;
@@ -144,7 +154,7 @@ function parallelismToScore(factor: number): number {
 
 export function probeToPEV(probe: BlockProbe): PEVData {
   // Build PEVTx[] in source order. Status uses outbound to mark "source"
-  // (which renders striped — the visual that means "blocks others").
+  // (which renders striped, the visual that means "blocks others").
   const txs: PEVTx[] = probe.txs.map((t, i) => {
     const status = deriveStatus(t.wave, t.outboundConflicts);
     return {
@@ -158,8 +168,9 @@ export function probeToPEV(probe: BlockProbe): PEVData {
       writeCount: t.writeCount,
       inboundConflicts: t.inboundConflicts,
       outboundConflicts: t.outboundConflicts,
+      selector: t.selector ?? null,
       label: shortHex(t.hash, 6, 4),
-      contractLabel: t.contracts.length > 0 ? shortHex(t.contracts[0], 6, 4) : "—",
+      contractLabel: t.contracts.length > 0 ? shortHex(t.contracts[0], 6, 4) : "-",
     };
   });
 
@@ -195,7 +206,7 @@ export function probeToPEV(probe: BlockProbe): PEVData {
     label: shortHex(c.contract, 6, 4),
   }));
 
-  // Derived summary metrics — all honestly computed
+  // Derived summary metrics, all honestly computed
   const stateful = probe.statefulTxCount;
   const blockedCount = txs.filter((t) => t.wave > 0).length;
   const blockedPct = stateful > 0 ? Math.round((blockedCount / stateful) * 100) : 0;
@@ -232,3 +243,11 @@ export function probeToPEV(probe: BlockProbe): PEVData {
     hotContracts,
   };
 }
+
+// Note: server-side enrichment helper (resolves method + contract names
+// against Postgres caches + outbound API) is in `./enrich-pev.ts`. Kept
+// out of this file because client components import probe-to-pev for
+// types + shortHex, and pulling the enrichment lib would drag the `pg`
+// client into the browser bundle.
+//
+// Server callers:  import { enrichPEVData } from "@/lib/enrich-pev";

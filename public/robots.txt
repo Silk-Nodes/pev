@@ -1,0 +1,29 @@
+# pev, Parallel Execution Visualizer for Monad
+# https://pev.silknodes.io
+#
+# Default-allow for everything that exists. We don't have any private
+# sections. Every page is read-only public chain data.
+#
+# Rules:
+#   • Allow /api/og/  , social previews (Twitter, Telegram, Discord,
+#                       Facebook) fetch our dynamic OG card images from
+#                       this prefix. Blocking it would break link
+#                       unfurling everywhere.
+#   • Disallow /api/  , the rest of /api/* returns JSON (block, tx,
+#                       contract, leaderboard, stats, etc.). These are
+#                       data endpoints, not browseable pages. Search
+#                       engines should index the HTML routes (/block/N,
+#                       /contract/0x..., etc.) instead, which we link to
+#                       from the JSON responses' Content-Location if
+#                       relevant.
+#
+# Robots.txt rule precedence: the most-specific path match wins. So
+# `Allow: /api/og/` overrides `Disallow: /api/` for anything under
+# /api/og/, exactly the behavior we want.
+
+User-agent: *
+Allow: /
+Allow: /api/og/
+Disallow: /api/
+
+Sitemap: https://pev.silknodes.io/sitemap.xml

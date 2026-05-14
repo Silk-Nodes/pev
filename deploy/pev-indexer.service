@@ -1,0 +1,42 @@
+[Unit]
+Description=pev, Monad Parallel Execution Visualizer · indexer (block tracer + Postgres writer)
+Documentation=https://github.com/Silk-Nodes/pev
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/pev
+
+# Run via the nvm-aware wrapper so we don't hardcode a Node version path
+ExecStart=/home/deploy/pev/deploy/run.sh indexer
+
+# Restart on any failure with a small backoff. The indexer is mostly
+# idempotent, re-tracing a block overwrites cleanly.
+Restart=on-failure
+RestartSec=5s
+# Cap restart attempts so a wedged config doesn't loop forever
+StartLimitBurst=10
+StartLimitIntervalSec=300
+
+# Logs go to journalctl. Tail with: journalctl -u pev-indexer -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pev-indexer
+
+# Resource hygiene, sized for 4 workers indexing testnet/mainnet
+LimitNOFILE=65536
+TimeoutStopSec=15s
+
+# Security hardening (defensive defaults; everything we need still works)
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+# Allow writing to the project dir (not the rest of $HOME)
+ReadWritePaths=/home/deploy/pev
+
+[Install]
+WantedBy=multi-user.target

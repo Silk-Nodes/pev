@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ModeToggle — execution / conflict / heatmap segmented control.
+ * ModeToggle, execution / conflict / heatmap segmented control.
  *
  * v1: only "execution" mode is fully implemented (the wave gantt). The other
  * two modes are stubbed for visual parity with variation-a, but currently

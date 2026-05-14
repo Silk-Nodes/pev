@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ConflictGraph — SVG-based DAG of conflict edges.
+ * ConflictGraph, SVG-based DAG of conflict edges.
  *
  * Layout:
  *   - X = position in block (later txs sit further right)
@@ -128,7 +128,7 @@ export default function ConflictGraph({ height = 280 }: Props) {
           const b = nodePos(to);
           const isActive = selected && (c.fromId === selected || c.toId === selected);
           const dim = !!selected && !isActive;
-          // mid-control point — bow upward so edges don't overlap nodes
+          // mid-control point, bow upward so edges don't overlap nodes
           const mx = (a.x + b.x) / 2;
           const my = (a.y + b.y) / 2 - Math.max(14, Math.abs(b.x - a.x) * 0.08);
 
@@ -220,7 +220,7 @@ export default function ConflictGraph({ height = 280 }: Props) {
           alignItems: "center",
         }}
       >
-        <span>— write/write</span>
+        <span>- write/write</span>
         <span>- - read/write</span>
       </div>
 
