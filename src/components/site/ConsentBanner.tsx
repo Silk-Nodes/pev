@@ -96,22 +96,26 @@ export default function ConsentBanner() {
         fontFamily: themeA.sans,
         fontSize: 12,
         lineHeight: 1.55,
-        color: themeA.muted,
+        // Banner body uses themeA.text (~12:1 on the panel) instead of
+        // themeA.muted (~5:1). Two reasons: (1) Lighthouse was reporting
+        // the dialog region as low-contrast because of the Decline
+        // button inside it, and bumping the body too removes any
+        // ambiguity; (2) consent copy is information the user needs to
+        // read once, so it should pop, not whisper.
+        color: themeA.text,
       }}
     >
       <div style={{ marginBottom: 14 }}>
         pev uses{" "}
-        <span className="pev-mono" style={{ color: themeA.text }}>
-          Google&nbsp;Analytics
-        </span>{" "}
-        to see which pages people actually find useful. Anonymous
-        pageviews only, no personal data, no ads, no sharing. Full
-        details in our{" "}
-        <Link
-          href="/privacy"
-          className="pev-link"
-          style={{ color: themeA.muted }}
-        >
+        <span className="pev-mono">Google&nbsp;Analytics</span> to see
+        which pages people actually find useful. Anonymous pageviews
+        only, no personal data, no ads, no sharing. Full details in our{" "}
+        {/* No inline color override: the .pev-link warm tone (#c8a47a,
+            ~8.6:1 on panel) reads as "clickable" and passes AA on its
+            own. Previously the inline themeA.muted matched the
+            surrounding text and the only link signal was the
+            underline, which is weaker affordance than color + underline. */}
+        <Link href="/privacy" className="pev-link">
           privacy policy
         </Link>
         .
@@ -138,7 +142,12 @@ export default function ConsentBanner() {
           onClick={() => persist("declined")}
           style={{
             background: "transparent",
-            color: themeA.subtle,
+            // themeA.muted (#8a8577) gives ~5.06:1 on the panel, comfortably
+            // above WCAG AA's 4.5:1 floor for normal text. The previous
+            // themeA.subtle (#827b6c) came in at ~4.44:1, technically a
+            // fail. Visual hierarchy is preserved: filled Accept button
+            // still dominates, Decline reads as a quiet secondary action.
+            color: themeA.muted,
             border: "none",
             padding: "8px 4px",
             fontSize: 12,
