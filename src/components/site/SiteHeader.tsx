@@ -87,12 +87,14 @@ export default function SiteHeader({
             (home variant) we still want flex space here so LiveStatus +
             Silk Nodes float to the right edge.
 
-            flex-basis: 260px makes this slot demand at least 260px of
-            ideal space, which in practice means when the lockup+tagline
-            and right-cluster together would squeeze the spacer below
-            that, the whole search wraps to a new row instead of
-            cramming up against the nav links. */}
-        <div style={{ flex: "1 1 260px", display: "flex", justifyContent: "center", minWidth: 0 }}>
+            flex: 1 (flex-basis 0%) lets this slot take whatever space
+            is left over without demanding a minimum. The orange button's
+            visual breathing room from the right cluster is enforced by
+            the header's gap (28px) and the form's maxWidth (360px in
+            SearchBox), not by trying to reserve space here, which would
+            force the right cluster to wrap to a new row on otherwise-
+            fine viewports. */}
+        <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
           {showSearch && <SearchBox variant="header" />}
         </div>
 
