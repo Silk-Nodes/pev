@@ -46,7 +46,11 @@ export default function SiteHeader({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 18,
+          // 28px gap (was 18) gives the search form's orange submit
+          // button visible breathing room from the right-cluster nav,
+          // which on long-tagline pages (contract page especially) was
+          // butting the button up against the "analytics" link.
+          gap: 28,
           flexWrap: "wrap",
           paddingBottom: 18,
           borderBottom: `1px solid ${themeA.border}`,
@@ -81,8 +85,14 @@ export default function SiteHeader({
 
         {/* Spacer that doubles as the search slot. When search is hidden
             (home variant) we still want flex space here so LiveStatus +
-            Silk Nodes float to the right edge. */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
+            Silk Nodes float to the right edge.
+
+            flex-basis: 260px makes this slot demand at least 260px of
+            ideal space, which in practice means when the lockup+tagline
+            and right-cluster together would squeeze the spacer below
+            that, the whole search wraps to a new row instead of
+            cramming up against the nav links. */}
+        <div style={{ flex: "1 1 260px", display: "flex", justifyContent: "center", minWidth: 0 }}>
           {showSearch && <SearchBox variant="header" />}
         </div>
 

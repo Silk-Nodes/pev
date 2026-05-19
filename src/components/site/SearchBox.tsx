@@ -73,7 +73,12 @@ export default function SearchBox({
           display: "flex",
           alignItems: "stretch",
           width: "100%",
-          maxWidth: 420,
+          // 360 (was 420): the header search is for short queries (block
+          // numbers, addresses, tx hashes), 360px is plenty of room.
+          // The narrower max lets the orange submit button sit comfortably
+          // away from the right-cluster nav even when the page tagline
+          // is long.
+          maxWidth: 360,
         }}
       >
         <div style={{ position: "relative", flex: 1, display: "flex" }}>

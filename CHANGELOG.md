@@ -27,6 +27,16 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
 - `deploy/RELEASING.md`: step-by-step runbook for cutting a new release.
 - Pointer in `CONTRIBUTING.md` linking maintainers to the release flow.
 
+### Fixed
+
+- Header layout on pages with long taglines (contract page especially):
+  the orange search-submit button was butting up against the "analytics"
+  nav link with no visible breathing room. Bumped the header gap from
+  18 to 28, added a `flex-basis: 260px` to the search slot so it wraps
+  to a new row on cramped viewports, and reduced the header search
+  maxWidth from 420 to 360 since short queries (block numbers,
+  addresses, tx hashes) don't need a wide field.
+
 ## [0.1.0] - 2026-05-14
 
 First public release. pev runs in production at
