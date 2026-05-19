@@ -32,10 +32,11 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
 - Header layout on pages with long taglines (contract page especially):
   the orange search-submit button was butting up against the "analytics"
   nav link with no visible breathing room. Bumped the header gap from
-  18 to 28, added a `flex-basis: 260px` to the search slot so it wraps
-  to a new row on cramped viewports, and reduced the header search
-  maxWidth from 420 to 360 since short queries (block numbers,
-  addresses, tx hashes) don't need a wide field.
+  18 to 28 and reduced the header search maxWidth from 420 to 360 since
+  short queries (block numbers, addresses, tx hashes) don't need a wide
+  field. Visual breathing room is enforced by the gap + form max, not
+  by reserving flex space in the search slot, which would force the
+  right cluster to wrap to a new row on otherwise-fine viewports.
 
 ## [0.1.0] - 2026-05-14
 
