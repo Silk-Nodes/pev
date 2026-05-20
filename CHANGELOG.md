@@ -135,6 +135,18 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   different hash right there, instead of having to navigate back to
   the homepage. Common case: someone pastes a hash with a missing
   character; they should be able to fix it without losing context.
+- /go smart-routing now disambiguates block hashes from tx hashes via
+  the chain RPC. Both are 32-byte values (64 hex chars) and look
+  identical, so we previously routed every 64-hex input to /tx/[hash]
+  and showed "not found" when the user pasted a block hash from an
+  explorer. We now query eth_getTransactionByHash AND
+  eth_getBlockByHash in parallel (one RPC roundtrip, ~200ms) and
+  route accordingly: if it's a tx, /tx/[hash]; if it's a block, the
+  redirect lands on /block/[number] using the block number from the
+  RPC response; if neither, /tx/[hash] which renders the editorial
+  "not found on Monad" message. Search placeholders updated on both
+  the header and hero search boxes to mention "hash" generically
+  instead of just "tx hash" so users know either kind works.
 
 ### Fixed
 

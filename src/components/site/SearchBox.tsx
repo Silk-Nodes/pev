@@ -89,7 +89,7 @@ export default function SearchBox({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             aria-label="Search blocks, contracts, or transactions"
-            placeholder="block # · 0x address · tx hash · /"
+            placeholder="block # · 0x address · hash · /"
             autoComplete="off"
             spellCheck={false}
             style={{
@@ -137,7 +137,7 @@ export default function SearchBox({
           onChange={(e) => setValue(e.target.value)}
           autoFocus={autoFocus}
           aria-label="Search blocks, contracts, or transactions"
-          placeholder="0x… contract address, paste a block #, or type 'latest'"
+          placeholder="0x… address, block #, tx or block hash, or type 'latest'"
           autoComplete="off"
           spellCheck={false}
           style={{
