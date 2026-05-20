@@ -1,4 +1,7 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import LiveStatus from "@/components/parallel/LiveStatus";
 import { PEVLockup } from "@/components/parallel/PEVBrand";
 import { themeA } from "@/components/parallel/theme";
@@ -19,9 +22,22 @@ import Link from "next/link";
  * visitors (Twitter shares, Google long-tail) a second "back to home"
  * affordance, the wordmark click alone is too easy to miss.
  *
- * The component is a Server Component. The only client-side concern
- * is LiveStatus, which is itself a client component; React happily
- * lets us compose it from here without flipping this file to client.
+ * Smart-sticky behavior:
+ *   The header uses `position: sticky` with a scroll-direction effect.
+ *   At the top of the page it sits in normal flow. Scrolling DOWN
+ *   translates it -100% off-screen so the content area takes the full
+ *   viewport (better for reading long pages like /docs and /analytics).
+ *   Scrolling UP at all brings it straight back into view (search and
+ *   nav are one upward flick away). This matches YouTube/Medium/Twitter
+ *   mobile and gives the user navigation control without compromising
+ *   pev's editorial brand: the chrome is present when wanted, invisible
+ *   when not.
+ *
+ * Why "use client": the scroll-direction tracking requires useEffect +
+ * window.scrollY, which are client-only. The component still SSRs (its
+ * JSX renders to HTML for crawlers / first paint), it just hydrates on
+ * the client to attach the scroll listener. LiveStatus inside was already
+ * client-only, so this is a marginal change in the bundle topology.
  */
 
 interface Props {
@@ -49,6 +65,54 @@ export default function SiteHeader({
 }: Props) {
   const showSearch = variant === "internal";
 
+  // hidden=true → translateY(-100%), off-screen above the viewport.
+  // Toggled by scroll direction with a small threshold to avoid jitter.
+  const [hidden, setHidden] = useState(false);
+  const lastYRef = useRef(0);
+
+  useEffect(() => {
+    // requestAnimationFrame-coalesced scroll handler. Browsers fire
+    // scroll events much faster than we need to react; this caps the
+    // update rate at ~60fps and keeps the handler off the main thread's
+    // critical path.
+    let ticking = false;
+
+    const onScroll = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const delta = y - lastYRef.current;
+
+        // Always visible inside the first 100px of scroll. The header
+        // is in its natural position there, no point hiding it. This
+        // also handles the page-load case (y=0) so the header is
+        // visible immediately on first paint.
+        if (y < 100) {
+          if (hidden) setHidden(false);
+          lastYRef.current = y;
+          ticking = false;
+          return;
+        }
+
+        // 6px direction-change threshold filters out trackpad inertia
+        // and sub-pixel scroll noise that would otherwise flicker the
+        // header. Real intentional scrolls easily clear 6px.
+        if (Math.abs(delta) < 6) {
+          ticking = false;
+          return;
+        }
+
+        setHidden(delta > 0); // scrolling down → hide; scrolling up → show
+        lastYRef.current = y;
+        ticking = false;
+      });
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [hidden]);
+
   return (
     <>
       <header
@@ -63,8 +127,34 @@ export default function SiteHeader({
           gap: 28,
           flexWrap: "wrap",
           paddingBottom: 18,
+          // 16px paddingTop balances the layout when the header is
+          // stuck at the viewport top: without it, the brand mark sat
+          // flush against the very edge of the screen, which read as
+          // jarring. Sets a "comfortable height" for the sticky band.
+          paddingTop: 16,
           borderBottom: `1px solid ${themeA.border}`,
           marginBottom: breadcrumb ? 14 : 28,
+
+          // Smart-sticky: pinned to the top, slides up when scrolling
+          // down, slides back when scrolling up. The transform-based
+          // hide doesn't take the element out of flow, so the breadcrumb
+          // and page content below don't reshuffle on toggle.
+          position: "sticky",
+          top: 0,
+          // Above page content (default z=0), below the consent banner
+          // (z=1000) and any future modals.
+          zIndex: 100,
+          // Opaque background so page content scrolling underneath
+          // doesn't bleed through. Matches body bg so the transition
+          // from "in flow" to "stuck at top" is invisible.
+          background: themeA.bg,
+          transform: hidden ? "translateY(-100%)" : "translateY(0)",
+          // 240ms ease-out: fast enough not to feel laggy, slow enough
+          // for the eye to register it as a deliberate motion.
+          transition: "transform 240ms ease-out",
+          // Tell the browser this element's transform will change so it
+          // can promote to a compositor layer and animate on the GPU.
+          willChange: "transform",
         }}
       >
         {/* Lockup + tagline, the brand half of the masthead. */}
