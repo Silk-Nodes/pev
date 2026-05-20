@@ -330,8 +330,16 @@ function Row({
   return (
     <Link
       href={`/block/${block.number}`}
+      // Classes hook into the responsive rules in globals.css:
+      //   .pev-live-row              compacts gap/padding on mobile
+      //   .pev-live-row-extra        items hidden on mobile (hash, tx)
+      //   .pev-live-row-age-suffix   trims " ago" to just the number
+      className="pev-live-row"
       style={{
         display: "grid",
+        // Desktop: dot, block#+hash, tx, score, conf, age.
+        // Mobile (via globals.css media query) overrides this to
+        // 4 columns: dot, block#, score+conf bundled, age.
         gridTemplateColumns: "auto 1fr auto auto auto auto",
         gap: 18,
         alignItems: "center",
@@ -358,18 +366,35 @@ function Row({
           height: 6,
           borderRadius: "50%",
           background: color,
+          flexShrink: 0,
         }}
       />
-      <span style={{ color: themeA.text }}>
+      <span style={{ color: themeA.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
         #{block.number.toLocaleString()}
-        <span style={{ color: themeA.subtle, marginLeft: 10 }}>{shortHex(block.hash, 6, 4)}</span>
+        <span
+          className="pev-live-row-extra"
+          style={{ color: themeA.subtle, marginLeft: 10 }}
+        >
+          {shortHex(block.hash, 6, 4)}
+        </span>
       </span>
-      <span style={{ color: themeA.muted, whiteSpace: "nowrap" }}>{block.txCount} tx</span>
+      <span
+        className="pev-live-row-extra"
+        style={{ color: themeA.muted, whiteSpace: "nowrap" }}
+      >
+        {block.txCount} tx
+      </span>
       <span style={{ color, whiteSpace: "nowrap" }}>{block.parallelismScore}/100</span>
       <span style={{ color: themeA.muted, whiteSpace: "nowrap" }}>
         {block.conflictCount} conf
       </span>
-      <span style={{ color: themeA.subtle, whiteSpace: "nowrap" }}>{ageLabel} ago</span>
+      <span style={{ color: themeA.subtle, whiteSpace: "nowrap" }}>
+        {ageLabel}
+        {/* The literal " ago" is desktop-only chrome. On mobile we
+            already only have ~5 columns, the age column is clearly
+            time-ago by position, the suffix is just noise. */}
+        <span className="pev-live-row-age-suffix"> ago</span>
+      </span>
     </Link>
   );
 }
