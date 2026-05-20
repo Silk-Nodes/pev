@@ -41,6 +41,17 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   YAML and upserts into the `contract_labels` table. Safe to re-run
   after editing the YAML.
 
+### Changed
+
+- Contract page metadata (`<title>`, OG title, Twitter card title) now
+  uses the human-readable contract name when one is available in the
+  `contract_labels` table. For example, `/contract/0x34b6...` now reads
+  as "Perpl, parallel profile · pev" instead of "Contract 0x34b6...2a6f
+  · pev". Critical for SEO and social-link previews on labeled
+  contracts. Unlabeled contracts continue to use the short hex
+  fallback. The resolver is cache-first so the metadata-path overhead
+  is sub-millisecond.
+
 ### Fixed
 
 - Header layout on pages with long taglines (contract page especially):

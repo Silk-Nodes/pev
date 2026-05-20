@@ -214,14 +214,30 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
   // Per-contract OG card. ?v=N is the design-version cache-bust.
   const ogImageUrl = `/api/og/contract/${lower}?v=5`;
   const shortLabel = `${lower.slice(0, 8)}…${lower.slice(-4)}`;
-  const title = `Contract ${shortLabel} · pev`;
-  const description = `Parallel-execution profile for contract ${lower}: avg parallelism, hot storage slots, conflicts caused.`;
+
+  // Look up a human-readable label so the page title reads
+  // "Perpl · pev" instead of "Contract 0x34b6...2a6f · pev". This is
+  // critical for SEO and social-link previews on labeled contracts.
+  // resolveContract is cache-first (single indexed read against
+  // contract_labels), so the overhead in the metadata-only path is
+  // sub-millisecond for any address we've seen before.
+  const name = await resolveContract(lower).catch(() => null);
+  // Display headline differs from the SEO title by intent:
+  //   • title (browser tab, social card): "Perpl, parallel profile · pev"
+  //     reads as editorial, has the name first, keywords still present.
+  //   • headline (when name is missing): "Contract 0x34b6...2a6f · pev"
+  //     falls back to the short hex for unlabeled contracts.
+  const displayLabel = name ?? `Contract ${shortLabel}`;
+  const title = `${displayLabel}, parallel profile · pev`;
+  const description = name
+    ? `Parallel-execution profile for ${name} (${lower}): avg parallelism, hot storage slots, conflicts caused.`
+    : `Parallel-execution profile for contract ${lower}: avg parallelism, hot storage slots, conflicts caused.`;
   // Always use lowercase address in the canonical so Google doesn't
   // see /contract/0xABC… and /contract/0xabc… as separate pages.
   const canonicalPath = `/contract/${lower}`;
 
   return {
-    title: `Contract ${shortLabel}`,
+    title: `${displayLabel}, parallel profile`,
     description,
     alternates: {
       canonical: canonicalPath,
@@ -236,7 +252,7 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: `pev, contract ${shortLabel} parallelism profile`,
+          alt: `pev, ${displayLabel} parallelism profile`,
         },
       ],
     },
