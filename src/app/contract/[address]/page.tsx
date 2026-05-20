@@ -1181,6 +1181,13 @@ function humanizeMethod(
 }
 
 function VerdictBlock({ verdict }: { verdict: Verdict }) {
+  // For "Bottlenecked" and "Throughput-killer" verdicts, the reader's
+  // natural follow-up is "does this cost me gas?" The answer (no, not
+  // directly) is important enough that pev should state it inline.
+  // Healthy verdicts don't need this clarifier, the verdict already
+  // reads as "you're fine".
+  const needsClarifier = verdict.tier !== "healthy";
+
   return (
     <section
       style={{
@@ -1212,6 +1219,34 @@ function VerdictBlock({ verdict }: { verdict: Verdict }) {
       >
         {verdict.message}
       </span>
+      {needsClarifier && (
+        // Full-width row below the label + message, quieter (subtle
+        // color, smaller size) so it reads as a footnote-style aside,
+        // not as part of the headline. Pre-empts the most common
+        // misreading of the verdict: "this contract is overcharging me".
+        <div
+          style={{
+            width: "100%",
+            fontSize: 12,
+            color: themeA.subtle,
+            fontFamily: themeA.mono,
+            lineHeight: 1.6,
+            marginTop: 6,
+          }}
+        >
+          Doesn&apos;t directly cost users extra gas, re-executions are
+          absorbed by the chain. The cost is to overall chain throughput,
+          which can surface as higher base fees during congestion.{" "}
+          <Link
+            href="/docs#metrics"
+            className="pev-link"
+            style={{ fontFamily: "inherit" }}
+          >
+            More on /docs
+          </Link>
+          .
+        </div>
+      )}
     </section>
   );
 }
