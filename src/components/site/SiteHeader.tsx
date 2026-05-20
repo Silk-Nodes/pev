@@ -286,7 +286,7 @@ export default function SiteHeader({
               whiteSpace: "nowrap",
             }}
           >
-            by Silk Nodes →
+            by Silk Nodes
           </a>
         </div>
       </header>
