@@ -26,6 +26,20 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
 - `CHANGELOG.md` (this file) as the canonical record of changes.
 - `deploy/RELEASING.md`: step-by-step runbook for cutting a new release.
 - Pointer in `CONTRIBUTING.md` linking maintainers to the release flow.
+- `data/contract-labels.yaml`: curated labels for the top 100 contracts
+  on Monad mainnet. 23 auto-discovered via on-chain ERC-20 `name()`
+  calls (Wrapped MON, USDC, AUSD, ShMonad, Kuru Vault, NFTs, memecoins),
+  plus 10 manually researched dApp infrastructure contracts including
+  Perpl (#1 throughput killer), Kuru Exchange (three markets), FastLane
+  AuctionHandler, Uniswap PoolManager, Nad.fun bonding curve, Monad
+  Staking system contract, RedStone oracle adapters. The analytics
+  leaderboard and contract pages now show recognizable names instead of
+  raw hex for these addresses.
+- `scripts/probe-contract-labels.ts`: generates the YAML from a CSV of
+  candidate addresses by probing on-chain ERC-20 metadata and Sourcify.
+- `scripts/sync-contract-labels.ts`: idempotent loader that reads the
+  YAML and upserts into the `contract_labels` table. Safe to re-run
+  after editing the YAML.
 
 ### Fixed
 
