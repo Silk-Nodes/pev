@@ -355,7 +355,7 @@ export default async function ContractPage({ params, searchParams }: PageParams)
       />
       <SiteHeader
         variant="internal"
-        tagline="How this contract behaves under parallel load"
+        tagline="How this contract parallelizes"
         breadcrumb={
           <>
             <Crumb href="/">pev</Crumb>
@@ -962,7 +962,7 @@ function NotSeen({
     <main style={{ padding: "48px clamp(20px, 4vw, 64px)", maxWidth: 720, margin: "0 auto" }}>
       <SiteHeader
         variant="internal"
-        tagline="How this contract behaves under parallel load"
+        tagline="How this contract parallelizes"
         breadcrumb={
           <>
             <Crumb href="/">pev</Crumb>

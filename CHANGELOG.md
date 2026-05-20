@@ -37,6 +37,13 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   field. Visual breathing room is enforced by the gap + form max, not
   by reserving flex space in the search slot, which would force the
   right cluster to wrap to a new row on otherwise-fine viewports.
+- Shortened the two longest page taglines (both 45 chars) to fit the
+  header layout without crowding the nav: contract page from "How this
+  contract behaves under parallel load" to "How this contract
+  parallelizes" (mirrors the homepage "How Monad parallelizes" pattern),
+  and tx page from "One transaction's place in the parallel graph" to
+  "This tx in the parallel graph". Added a tagline-length guideline
+  (~35 char ceiling) to the `tagline` prop docs in SiteHeader.
 
 ## [0.1.0] - 2026-05-14
 
