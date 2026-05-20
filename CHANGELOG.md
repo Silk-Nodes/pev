@@ -76,6 +76,22 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   pop content around when toggling. SiteHeader was flipped to a Client
   Component to access window.scrollY; SSR is unchanged since Client
   Components still render to HTML.
+- SiteHeader transparent at the top, opaque when stuck. The header
+  previously had an always-on background and bottom border, which made
+  it read as a separate box floating above the page rather than as
+  part of the layout. Now at the top of the page (scrollY < 12) the
+  header has a transparent background and a transparent border, so it
+  blends seamlessly into the body. Once scrolled, the background and
+  border fade in over 180ms to provide a clean separator from content
+  scrolling underneath. Better natural feel without losing the "this
+  is the chrome" affordance when it matters.
+- SiteHeader mobile trim: on viewports under 720px the tagline and the
+  "by Silk Nodes →" attribution are hidden via display:none. Both are
+  available elsewhere (tagline echoed in the page hero, Silk Nodes
+  link in the footer), and dropping them keeps the right-cluster nav
+  from overflowing the right edge on phones. Header padding and gap
+  are also tighter on mobile so the sticky band doesn't dominate the
+  small viewport.
 
 ### Fixed
 

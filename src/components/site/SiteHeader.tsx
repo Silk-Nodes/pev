@@ -68,6 +68,12 @@ export default function SiteHeader({
   // hidden=true → translateY(-100%), off-screen above the viewport.
   // Toggled by scroll direction with a small threshold to avoid jitter.
   const [hidden, setHidden] = useState(false);
+  // scrolled=true once the user has moved past the very top of the
+  // page. Used to swap the header between "transparent, part of the
+  // page" (at top) and "opaque with a separator" (when stuck), so the
+  // header doesn't read as a separate box floating above the content
+  // when at the top of the page.
+  const [scrolled, setScrolled] = useState(false);
   const lastYRef = useRef(0);
 
   useEffect(() => {
@@ -83,6 +89,12 @@ export default function SiteHeader({
       requestAnimationFrame(() => {
         const y = window.scrollY;
         const delta = y - lastYRef.current;
+
+        // 12px threshold for "scrolled" avoids the bg/border flickering
+        // on micro-scrolls at the very top of the page (e.g. someone
+        // bumping the trackpad). Once they're clearly past the top, we
+        // commit to the opaque state.
+        setScrolled(y > 12);
 
         // Always visible inside the first 100px of scroll. The header
         // is in its natural position there, no point hiding it. This
@@ -117,6 +129,7 @@ export default function SiteHeader({
     <>
       <header
         role="banner"
+        className="pev-site-header"
         style={{
           display: "flex",
           alignItems: "center",
@@ -132,7 +145,11 @@ export default function SiteHeader({
           // flush against the very edge of the screen, which read as
           // jarring. Sets a "comfortable height" for the sticky band.
           paddingTop: 16,
-          borderBottom: `1px solid ${themeA.border}`,
+          // Border only when scrolled past the top. At the top of the
+          // page the header is part of the layout (no separator); once
+          // stuck it gets a quiet line so it reads as a defined band
+          // over the scrolling content.
+          borderBottom: scrolled ? `1px solid ${themeA.border}` : "1px solid transparent",
           marginBottom: breadcrumb ? 14 : 28,
 
           // Smart-sticky: pinned to the top, slides up when scrolling
@@ -144,14 +161,16 @@ export default function SiteHeader({
           // Above page content (default z=0), below the consent banner
           // (z=1000) and any future modals.
           zIndex: 100,
-          // Opaque background so page content scrolling underneath
-          // doesn't bleed through. Matches body bg so the transition
-          // from "in flow" to "stuck at top" is invisible.
-          background: themeA.bg,
+          // Background only when scrolled. At the top of the page the
+          // header has no background, so it reads as part of the page
+          // rather than a floating box stuck above it. Once stuck, the
+          // opaque bg prevents content scrolling underneath from
+          // bleeding through. The transition smooths the swap.
+          background: scrolled ? themeA.bg : "transparent",
           transform: hidden ? "translateY(-100%)" : "translateY(0)",
           // 240ms ease-out: fast enough not to feel laggy, slow enough
           // for the eye to register it as a deliberate motion.
-          transition: "transform 240ms ease-out",
+          transition: "transform 240ms ease-out, background 180ms ease-out, border-color 180ms ease-out",
           // Tell the browser this element's transform will change so it
           // can promote to a compositor layer and animate on the GPU.
           willChange: "transform",
@@ -172,7 +191,7 @@ export default function SiteHeader({
           </Link>
           {tagline && (
             <span
-              className="pev-eyebrow"
+              className="pev-eyebrow pev-header-tagline"
               style={{
                 letterSpacing: ".18em",
                 color: themeA.subtle,
@@ -258,7 +277,7 @@ export default function SiteHeader({
             href="https://silknodes.io"
             target="_blank"
             rel="noreferrer"
-            className="pev-link"
+            className="pev-link pev-header-silknodes"
             style={{
               fontFamily: themeA.mono,
               fontSize: 11,
