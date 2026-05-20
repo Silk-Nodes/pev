@@ -92,6 +92,17 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   from overflowing the right edge on phones. Header padding and gap
   are also tighter on mobile so the sticky band doesn't dominate the
   small viewport.
+- LiveBlockFeed row mobile trim: the 6-column desktop row (dot, block
+  number + hash, tx count, score, conflicts, "Xs ago") was getting
+  clipped on the right edge on phones, hiding the age and making
+  multi-digit conflict counts look broken. Mobile now uses a 4-column
+  layout: dot, block number, score, conflicts, age. We drop the block
+  hash (redundant with the block number for ID purposes), drop the tx
+  count (less interesting than parallelism + conflicts in a glance
+  feed), and drop the literal " ago" suffix on the age (the column's
+  position already reads as "time"). Padding and gap tighten too.
+  Every row now fits comfortably on a 390px iPhone viewport, including
+  3-digit conflict counts.
 
 ### Fixed
 

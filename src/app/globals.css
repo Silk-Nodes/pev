@@ -267,6 +267,33 @@ body {
   }
 }
 
+/* ─── LiveBlockFeed row responsive layout ─────────────────────────
+ *
+ * Desktop: 6-column grid with block#+hash, tx count, score, conflicts,
+ * and "Xs ago". Fits comfortably at 1280px container width.
+ *
+ * Mobile: 4 columns. We hide the block hash and tx count (redundant
+ * for a quick-glance feed: the block number is the canonical ID, and
+ * tx count is less interesting than parallelism + conflicts). We also
+ * drop the literal " ago" suffix on the age since the column's
+ * position already communicates "time" at a glance. Result: every row
+ * fits comfortably on a 390px iPhone viewport, including blocks with
+ * 3-digit conflict counts.
+ */
+@media (max-width: 720px) {
+  .pev-live-row {
+    grid-template-columns: auto minmax(0, 1fr) auto auto auto !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+  }
+  .pev-live-row-extra {
+    display: none !important;
+  }
+  .pev-live-row-age-suffix {
+    display: none !important;
+  }
+}
+
 /* Bottleneck-contract chip under the search, borrows the chip pattern
    used elsewhere in the editorial UI but with a warm border on hover so
    it reads as "click to investigate this offender" rather than passive. */
