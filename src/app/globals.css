@@ -227,6 +227,16 @@ body {
   100% { color: var(--pev-text);  text-shadow: none; }
 }
 
+/* Slide-in for newly-arrived rows in LiveBlockFeed. Pairs with the
+   ember-tint background fade so the arrival reads as motion rather
+   than a jump. Short duration (260ms) so it never delays the user's
+   ability to actually read the row, but long enough that the eye
+   registers it as "new arrival" instead of "list reordered". */
+@keyframes pev-row-slide-in {
+  0%   { transform: translateY(-100%); opacity: 0; }
+  100% { transform: translateY(0);     opacity: 1; }
+}
+
 /* Bottleneck-contract chip under the search, borrows the chip pattern
    used elsewhere in the editorial UI but with a warm border on hover so
    it reads as "click to investigate this offender" rather than passive. */

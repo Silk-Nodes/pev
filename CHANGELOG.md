@@ -51,6 +51,19 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   contracts. Unlabeled contracts continue to use the short hex
   fallback. The resolver is cache-first so the metadata-path overhead
   is sub-millisecond.
+- LiveBlockFeed (the "Recent activity" list on the homepage) now pauses
+  incoming rows when the user hovers the feed. New blocks queue
+  silently while the cursor is inside the feed; a small ember-tinted
+  chip appears at the top reading "N new blocks, click or move away to
+  load". On mouse-leave or chip click, the queued blocks flow in
+  together with the existing ember-tint fresh highlight plus a new
+  260ms slide-in animation. This solves the previous problem where
+  rows shifted every ~0.5-1s as Monad blocks arrived, making them
+  effectively unreadable for anyone trying to focus on a row. The feed
+  remains genuinely live (the status pill stays green, the queue
+  fills in real time), the user just gets visual stability while
+  reading. Also dropped maxRows default from 20 to 10 since 20 was
+  more vertical footprint than the page needed.
 
 ### Fixed
 
