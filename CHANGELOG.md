@@ -121,6 +121,20 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   base fees during congestion. Important framing so the throughput-
   killer leaderboard doesn't get read as "these contracts are
   overcharging users".
+- /tx/[hash] not-found page now distinguishes three real outcomes
+  instead of one generic "not in index" message. When the requested
+  tx isn't in pev's database, we now ask the Monad RPC whether the
+  hash exists on chain at all and render:
+    - "Tx not found on Monad" if the chain has no record (the hash is
+      from a different chain, testnet, or a typo)
+    - "Tx exists, but isn't indexed" with the actual block number if
+      the chain confirms it (block is outside our backfill window or
+      newer than the indexer has reached)
+    - "Tx not in index" generic fallback if the RPC was unreachable
+  The page also now embeds the SearchBox so the user can retry with a
+  different hash right there, instead of having to navigate back to
+  the homepage. Common case: someone pastes a hash with a missing
+  character; they should be able to fix it without losing context.
 
 ### Fixed
 

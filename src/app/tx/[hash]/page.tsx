@@ -5,6 +5,7 @@ import { resolveManyContracts, resolveMethod, labelFor } from "@/lib/enrichment"
 import { themeA } from "@/components/parallel/theme";
 import SiteHeader, { Crumb, CrumbSep } from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
+import SearchBox from "@/components/site/SearchBox";
 import { shortHex } from "@/lib/probe-to-pev";
 import type { ConflictKind } from "@/lib/parallel-probe";
 import Link from "next/link";
@@ -73,7 +74,18 @@ export default async function TxPage({ params }: PageParams) {
   const tx = await getTxDetail(lower);
 
   if (!tx) {
-    return <NotIndexed hash={lower} />;
+    // Before showing a generic "not in index" page, distinguish the
+    // two reasons a tx can be missing:
+    //   • The hash isn't a real Monad transaction at all (typo, copy
+    //     from a different chain, etc.)
+    //   • The hash IS on Monad but in a block outside our indexed
+    //     window (older than backfill start, or newer than the
+    //     indexer has reached)
+    // The error message we show should match reality so users don't
+    // wait around for a tx that doesn't exist, or assume pev is broken
+    // when actually they pasted the wrong hash.
+    const chainStatus = await checkTxOnChain(lower);
+    return <NotIndexed hash={lower} chainStatus={chainStatus} />;
   }
 
   // Bulk-resolve all contract labels in one cache hit (and any missing
@@ -431,9 +443,138 @@ function ConflictsSection({
   );
 }
 
-function NotIndexed({ hash }: { hash: string }) {
+/**
+ * checkTxOnChain, asks the Monad RPC whether this hash is a real
+ * transaction on the chain at all. Used by the NotIndexed branch to
+ * distinguish "this hash isn't on Monad" (user typo / wrong chain)
+ * from "this tx exists but isn't in pev's window yet" (indexing gap).
+ *
+ * Returns:
+ *   • "not-on-chain"     , eth_getTransactionByHash returned null
+ *   • { onChain: true, blockNumber } , tx exists in block N
+ *   • "rpc-error"        , the RPC was unreachable or returned junk
+ *
+ * The RPC error case is treated separately: we don't want to lie to
+ * the user by saying "tx not found on chain" if the truth is "we
+ * couldn't ask the chain right now". On error we fall back to the
+ * generic "not in index" message.
+ */
+type ChainStatus =
+  | "not-on-chain"
+  | "rpc-error"
+  | { onChain: true; blockNumber: number };
+
+async function checkTxOnChain(hash: string): Promise<ChainStatus> {
+  const rpcUrl = process.env.MONAD_RPC_URL ?? "https://rpc.silknodes.io/monad";
+  try {
+    const res = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "eth_getTransactionByHash",
+        params: [hash],
+      }),
+      // Don't let this hang the page render if the RPC is slow.
+      signal: AbortSignal.timeout(2000),
+    });
+    if (!res.ok) return "rpc-error";
+    const json = (await res.json()) as {
+      result?: { blockNumber?: string } | null;
+    };
+    if (json.result === null || json.result === undefined) return "not-on-chain";
+    if (typeof json.result.blockNumber === "string") {
+      return {
+        onChain: true,
+        blockNumber: parseInt(json.result.blockNumber, 16),
+      };
+    }
+    // Result exists but no blockNumber means pending tx, also "exists"
+    return { onChain: true, blockNumber: 0 };
+  } catch {
+    return "rpc-error";
+  }
+}
+
+function NotIndexed({
+  hash,
+  chainStatus,
+}: {
+  hash: string;
+  chainStatus: ChainStatus;
+}) {
+  // Compose the editorial copy based on what we actually found.
+  // Three honest framings, one per branch:
+  let title: string;
+  let body: React.ReactNode;
+  if (chainStatus === "not-on-chain") {
+    title = "Tx not found on Monad";
+    body = (
+      <>
+        <p style={{ color: themeA.muted, lineHeight: 1.7, marginBottom: 12 }}>
+          The hash{" "}
+          <span className="pev-mono" style={{ color: themeA.text }}>
+            {shortHex(hash, 10, 8)}
+          </span>{" "}
+          isn&apos;t a transaction on Monad mainnet. The RPC has no record
+          of it.
+        </p>
+        <p style={{ color: themeA.muted, lineHeight: 1.7 }}>
+          A few common causes: the hash is from a different EVM chain
+          (Ethereum, Base, an L2), the hash is from Monad testnet, or
+          there&apos;s a typo or truncation. Double-check the source
+          you copied it from.
+        </p>
+      </>
+    );
+  } else if (
+    typeof chainStatus === "object" &&
+    chainStatus.onChain
+  ) {
+    const blockLabel =
+      chainStatus.blockNumber > 0
+        ? `block #${chainStatus.blockNumber.toLocaleString()}`
+        : "a pending block";
+    title = "Tx exists, but isn't indexed";
+    body = (
+      <>
+        <p style={{ color: themeA.muted, lineHeight: 1.7, marginBottom: 12 }}>
+          Monad has{" "}
+          <span className="pev-mono" style={{ color: themeA.text }}>
+            {shortHex(hash, 10, 8)}
+          </span>{" "}
+          in {blockLabel}, but pev hasn&apos;t analyzed that block yet.
+        </p>
+        <p style={{ color: themeA.muted, lineHeight: 1.7 }}>
+          Most likely cause: the block is older than our indexing window
+          (we started on April 25, 2026) or just newer than the indexer
+          has reached this second. The latter usually resolves within
+          seconds, the former needs a backfill we haven&apos;t run yet.
+        </p>
+      </>
+    );
+  } else {
+    // "rpc-error" or anything unexpected. Honest framing: we don't
+    // know whether the tx exists, so don't pretend either way.
+    title = "Tx not in index";
+    body = (
+      <>
+        <p style={{ color: themeA.muted, lineHeight: 1.7, marginBottom: 12 }}>
+          We don&apos;t have{" "}
+          <span className="pev-mono" style={{ color: themeA.text }}>
+            {shortHex(hash, 10, 8)}
+          </span>{" "}
+          in our index. Either the block containing it isn&apos;t
+          covered by pev (outside our April 25, 2026 backfill window),
+          or the chain RPC wasn&apos;t reachable just now to confirm.
+        </p>
+      </>
+    );
+  }
+
   return (
-    <main style={{ padding: "48px clamp(20px, 4vw, 64px)", maxWidth: 720, margin: "0 auto" }}>
+    <main style={{ padding: "32px clamp(20px, 4vw, 64px) 80px", maxWidth: 720, margin: "0 auto" }}>
       <SiteHeader
         variant="internal"
         tagline="This tx in the parallel graph"
@@ -451,20 +592,37 @@ function NotIndexed({ hash }: { hash: string }) {
         className="pev-display-italic"
         style={{
           fontSize: 32,
-          marginBottom: 12,
+          marginBottom: 16,
           color: themeA.text,
-          marginTop: 32,
+          marginTop: 24,
         }}
       >
-        Tx not in index
+        {title}
       </h1>
-      <p style={{ color: themeA.muted, lineHeight: 1.6 }}>
-        We don't have <span className="pev-mono" style={{ color: themeA.text }}>{shortHex(hash, 10, 8)}</span> in our
-        index yet. The block containing it may not have been indexed
-        (newer than current head, or older than our backfill window).
-      </p>
-      <p style={{ marginTop: 22 }}>
-        <Link href="/" className="pev-link">← back to recent activity</Link>
+      {body}
+      {/* Hand the user the next action directly. A search box on the
+          not-found page is much friendlier than a "← back" link, the
+          most common reason someone lands here is a fat-fingered hash
+          and they want to retry, not navigate back to the home page. */}
+      <div
+        style={{
+          marginTop: 32,
+          paddingTop: 24,
+          borderTop: `1px solid ${themeA.border}`,
+        }}
+      >
+        <div
+          className="pev-eyebrow"
+          style={{ marginBottom: 12, color: themeA.muted }}
+        >
+          Try another search
+        </div>
+        <SearchBox variant="hero" />
+      </div>
+      <p style={{ marginTop: 28 }}>
+        <Link href="/" className="pev-link">
+          ← back to recent activity
+        </Link>
       </p>
     </main>
   );
