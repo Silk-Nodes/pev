@@ -64,6 +64,18 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   fills in real time), the user just gets visual stability while
   reading. Also dropped maxRows default from 20 to 10 since 20 was
   more vertical footprint than the page needed.
+- SiteHeader is now smart-sticky: pinned to the top of the viewport,
+  slides up off-screen when the user scrolls down, slides back in the
+  moment they scroll up. Always visible inside the first 100px of
+  scroll (header is in its natural position there). 6px direction-
+  change threshold prevents jitter from trackpad inertia. Pattern
+  matches YouTube/Medium/Twitter mobile: navigation is one upward
+  scroll-flick away on long pages (docs, analytics, contract pages)
+  but doesn't take real estate while reading. Implementation uses
+  `position: sticky` + a transform-based hide so the header doesn't
+  pop content around when toggling. SiteHeader was flipped to a Client
+  Component to access window.scrollY; SSR is unchanged since Client
+  Components still render to HTML.
 
 ### Fixed
 
