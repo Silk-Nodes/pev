@@ -35,7 +35,7 @@ export default function ContractLoading() {
     >
       <SiteHeader
         variant="internal"
-        tagline="How this contract behaves under parallel load"
+        tagline="How this contract parallelizes"
         breadcrumb={
           <>
             <Crumb href="/">pev</Crumb>

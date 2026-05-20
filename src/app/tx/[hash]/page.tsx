@@ -117,7 +117,7 @@ export default async function TxPage({ params }: PageParams) {
       />
       <SiteHeader
         variant="internal"
-        tagline="One transaction's place in the parallel graph"
+        tagline="This tx in the parallel graph"
         breadcrumb={
           <>
             <Crumb href="/">pev</Crumb>
@@ -436,7 +436,7 @@ function NotIndexed({ hash }: { hash: string }) {
     <main style={{ padding: "48px clamp(20px, 4vw, 64px)", maxWidth: 720, margin: "0 auto" }}>
       <SiteHeader
         variant="internal"
-        tagline="One transaction's place in the parallel graph"
+        tagline="This tx in the parallel graph"
         breadcrumb={
           <>
             <Crumb href="/">pev</Crumb>

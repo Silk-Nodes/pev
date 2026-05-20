@@ -26,7 +26,17 @@ import Link from "next/link";
 
 interface Props {
   variant?: "home" | "internal";
-  /** Eyebrow caption rendered next to the lockup. Each page sets its own. */
+  /**
+   * Eyebrow caption rendered next to the lockup. Each page sets its own.
+   *
+   * Keep this under ~35 characters. The lockup section is `flex-shrink: 0`,
+   * so a long tagline directly steals horizontal space from the search
+   * slot and pushes the orange submit button up against the right-cluster
+   * nav. Compare:
+   *   "How Monad parallelizes"           (22 chars, comfortable)
+   *   "How this contract parallelizes"   (30 chars, comfortable)
+   *   "How this contract behaves under parallel load"  (45 chars, cramped)
+   */
   tagline?: string;
   /** Optional breadcrumb row (composed JSX from the page). */
   breadcrumb?: ReactNode;
