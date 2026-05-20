@@ -103,6 +103,24 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   position already reads as "time"). Padding and gap tighten too.
   Every row now fits comfortably on a 390px iPhone viewport, including
   3-digit conflict counts.
+- Pre-empt the "does this cost me gas?" question on the contract page
+  verdict. When the verdict is "Bottlenecked" or "Throughput-killer",
+  a quiet single-line clarifier now appears below the headline: the
+  verdict refers to chain-wide throughput cost, not direct user gas
+  charges. Users pay for the final committed gasUsed; re-executions
+  are absorbed by the chain. The clarifier links to the new
+  "Re-execution and gas" entry in the docs glossary for the full
+  explanation. Healthy verdicts get no clarifier since there's nothing
+  to clarify there.
+- Added a "Re-execution and gas" entry to the docs metrics glossary
+  (Section 03). Directly answers a question we kept seeing from
+  developers reading pev: when a contract causes re-executions, who
+  pays? Answer: not the user directly. Users pay for the final
+  committed execution; re-execution overhead is validator compute that
+  surfaces as a chain-level throughput cost, eventually affecting
+  base fees during congestion. Important framing so the throughput-
+  killer leaderboard doesn't get read as "these contracts are
+  overcharging users".
 
 ### Fixed
 

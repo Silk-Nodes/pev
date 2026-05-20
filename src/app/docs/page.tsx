@@ -362,6 +362,29 @@ export default function DocsPage() {
         many of its own txs were the ones blocked.
       </Term>
 
+      <Term name="Re-execution and gas">
+        When two transactions conflict on a storage slot in the same
+        block, the chain re-executes the later one against the corrected
+        state.{" "}
+        <span style={{ color: themeA.text }}>
+          Users pay only for the final committed execution, not for the
+          chain&apos;s speculation work.
+        </span>{" "}
+        So a contract with a high &quot;conflicts caused&quot; count
+        isn&apos;t directly billing its users more gas. The actual cost
+        is{" "}
+        <em style={{ fontFamily: themeA.serif, fontStyle: "italic" }}>
+          chain-wide throughput
+        </em>
+        : every re-execution consumes validator compute that could have
+        processed another transaction. When enough contracts cause enough
+        re-execution, the chain&apos;s effective TPS drops, and that
+        eventually surfaces as higher base fees during congestion.
+        &quot;Throughput-killer&quot; is a chain-level problem, not a
+        per-tx wallet problem, even though it can still affect users
+        indirectly through fee dynamics.
+      </Term>
+
       {/* ─── 4. How to use pev ──────────────────────────────────── */}
       <SectionHeader id="workflows" eyebrow="04" title="How to use pev" />
 
