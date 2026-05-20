@@ -237,6 +237,36 @@ body {
   100% { transform: translateY(0);     opacity: 1; }
 }
 
+/* ─── SiteHeader responsive trims ────────────────────────────────
+ *
+ * On narrow viewports the header has to fit within a tight horizontal
+ * budget. We drop two pieces that exist elsewhere on the page so they
+ * don't push the right cluster off the right edge of the screen:
+ *
+ *   • Tagline: redundant with the homepage hero and the page's own
+ *     copy. The brand mark is enough chrome on mobile.
+ *   • "by Silk Nodes →": same attribution lives in the footer, which
+ *     mobile users will scroll to anyway. No information lost.
+ *
+ * Threshold matches our other responsive trims (.pev-grid-stats-4,
+ * .pev-feedback-pill) so the breakpoint behavior is consistent.
+ *
+ * We also tighten header padding + gap on mobile so the sticky band
+ * doesn't dominate the viewport. On a phone every vertical pixel
+ * matters; the desktop's comfortable 16/18 padding is overkill there.
+ */
+@media (max-width: 720px) {
+  .pev-header-tagline,
+  .pev-header-silknodes {
+    display: none;
+  }
+  .pev-site-header {
+    gap: 12px !important;
+    padding-top: 10px !important;
+    padding-bottom: 12px !important;
+  }
+}
+
 /* Bottleneck-contract chip under the search, borrows the chip pattern
    used elsewhere in the editorial UI but with a warm border on hover so
    it reads as "click to investigate this offender" rather than passive. */
