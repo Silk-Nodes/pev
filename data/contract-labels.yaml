@@ -536,3 +536,28 @@ contracts:
     name: "Uniswap: Universal Router"
     source: manual
     notes: "Provided by maintainer"
+
+# ─── Second batch of maintainer-added labels ─────────────────────
+# More DEX infrastructure surfaced after the first batch shipped.
+# Same rationale: high-visibility contracts people will link to.
+
+  - address: 0x18556da13313f3532c54711497a8fedac273220e
+    name: "LFJ: LBRouter"
+    source: manual
+    notes: "Liquidity Book router, provided by maintainer"
+  - address: 0x45a62b090df48243f12a21897e7ed91863e2c86b
+    name: "LFJ: JoeAggregatorRouter"
+    source: manual
+    notes: "Joe aggregator router, provided by maintainer"
+  - address: 0xb3e6778480b2e488385e8205ea05e20060b813cb
+    name: "Kuru Exchange: KuruFlowEntryPoint"
+    source: manual
+    notes: "Kuru flow entry point, provided by maintainer"
+  - address: 0xea1b8e4ab7f14f7dca68c5b214303b13078fc5ec
+    name: "LeverUp: LeverUp"
+    source: manual
+    notes: "Minimal proxy (460 bytecode chars), provided by maintainer"
+  - address: 0x4f02a29df8510975d293aab0b32af7340f406fb4
+    name: "aPriori: Swap"
+    source: manual
+    notes: "aPriori swap contract, provided by maintainer"
