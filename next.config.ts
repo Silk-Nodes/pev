@@ -74,9 +74,20 @@ const nextConfig: NextConfig = {
     ];
     // Order matters: when two header rules match the same path with the
     // same key, the LATER rule wins. So we set the public-index policy
-    // on the catch-all first, then override with noindex for /api/*.
-    // (Reversed order would make every /api/* response advertise itself
-    // as indexable, which we explicitly don't want for raw JSON.)
+    // on the catch-all first, then narrow it down with explicit
+    // overrides for the API surface.
+    //
+    // /api/v1/*  → noindex,nofollow (raw JSON, search engines should
+    //              index the HTML pages instead).
+    // /api/og/*  → keep public index policy. These are link-preview
+    //              images that social-card scrapers (Twitterbot,
+    //              facebookexternalhit, LinkedInBot, etc.) need to
+    //              fetch. We learned at launch that combining
+    //              `Disallow` in robots.txt with `X-Robots-Tag:
+    //              noindex,nofollow` on the same URL can cause
+    //              conservative scrapers to skip the fetch entirely.
+    //              Public index is the safe default.
+    // /api/health  → catch-all (no special header), trivial response.
     return [
       {
         source: "/:path*",
@@ -86,7 +97,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: "/api/:path*",
+        source: "/api/v1/:path*",
         headers: [
           ...securityHeaders,
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
