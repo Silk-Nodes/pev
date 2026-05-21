@@ -212,7 +212,12 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
   const lower = address.toLowerCase();
 
   // Per-contract OG card. ?v=N is the design-version cache-bust.
-  const ogImageUrl = `/api/og/contract/${lower}?v=5`;
+  // Note: served from /og/* not /api/og/*. Twitter's card validator
+  // heuristically flags ANY image URL with /api/ in the path as
+  // "may be restricted by robots.txt" even when it actually isn't,
+  // and that warning manifests as no image preview in tweets. Moving
+  // the OG routes out of /api/ entirely removes the warning.
+  const ogImageUrl = `/og/contract/${lower}?v=6`;
   const shortLabel = `${lower.slice(0, 8)}…${lower.slice(-4)}`;
 
   // Look up a human-readable label so the page title reads

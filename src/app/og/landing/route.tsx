@@ -1,5 +1,5 @@
 /**
- * GET /api/og/landing
+ * GET /og/landing
  *
  * The unfurl that lands when someone shares pev.silknodes.io itself.
  * Highest-volume share path, every Twitter/Discord post about pev that

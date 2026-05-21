@@ -178,6 +178,20 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   with the robots.txt Disallow to give conservative scrapers two
   signals to skip the fetch. /api/v1/* (the actual private JSON API)
   still gets noindex,nofollow as before.
+- Moved OG card routes from /api/og/* to /og/*. Twitter's card
+  validator has a hardcoded heuristic that flags ANY image URL with
+  /api/ in the path as "may be restricted by robots.txt" regardless
+  of whether the actual robots.txt rules apply. This warning persists
+  even when our robots.txt explicitly allows the URL for Twitterbot
+  (we verified Twitterbot can fetch the URL with curl), and it appears
+  to suppress the image preview in X tweet cards. Moving the routes
+  out of /api/ entirely sidesteps the validator's heuristic: the new
+  URLs are /og/contract/[address], /og/block/[number], /og/landing,
+  /og/docs, /og/analytics. Updated all meta tag references in the
+  page files (contract, block, docs, analytics) to point at the new
+  paths and bumped the cache-bust version (?v=6 for contract/block,
+  ?v=4 for analytics/docs) so X re-scrapes from scratch. Landing card
+  is unchanged since it already uses a static /og-card.jpg.
 
 ### Fixed
 

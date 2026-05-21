@@ -1,5 +1,5 @@
 /**
- * GET /api/og/docs
+ * GET /og/docs
  *
  * Unfurl for the /docs page. Editorial card with the same lockup,
  * footer band, and dark/cream variant rotation as the other pev OG

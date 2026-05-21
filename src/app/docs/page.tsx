@@ -59,7 +59,7 @@ export const metadata: Metadata = {
     url: "/docs",
     images: [
       {
-        url: "/api/og/docs?v=3",
+        url: "/og/docs?v=4",
         width: 1200,
         height: 630,
         alt: "pev docs, the manual: metrics, methodology, API reference",
@@ -71,7 +71,7 @@ export const metadata: Metadata = {
     title: "pev docs",
     description:
       "How pev works, what each metric means, how to read the contract page.",
-    images: ["/api/og/docs?v=3"],
+    images: ["/og/docs?v=4"],
   },
 };
 
@@ -564,8 +564,8 @@ export default function DocsPage() {
 
       <Endpoint
         method="GET"
-        path="/api/og/landing | /api/og/block/:n | /api/og/contract/:addr | /api/og/analytics"
-        body="Dynamic 1200×630 OG card images. Edge-cached. Used by social previews; safe to deep-link if you want a fresh card."
+        path="/og/landing | /og/block/:n | /og/contract/:addr | /og/analytics | /og/docs"
+        body="Dynamic 1200×630 OG card images (JPEG). Edge-cached. Used by social previews; safe to deep-link if you want a fresh card. Served from /og/ rather than /api/og/ because Twitter's card validator heuristically flags any /api/* image URL as 'may be robots.txt-restricted'."
       />
 
       <P>

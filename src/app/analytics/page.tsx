@@ -35,9 +35,11 @@ import { shortHex } from "@/lib/probe-to-pev";
 
 const WINDOW_DAYS = 7;
 
-// Per-page OG card with the headline + #1 killer + 7d stats. ?v=N is
-// the cache-bust knob for Twitter/Discord preview caches.
-const OG_IMAGE_URL = "/api/og/analytics?v=3";
+// Per-page OG card with the headline + #1 killer + 7d stats. Served
+// from /og/ not /api/og/ so Twitter's card validator doesn't flag it
+// as "may be robots.txt-restricted" (heuristic check on /api/* URLs).
+// ?v=N is the cache-bust knob for Twitter/Discord preview caches.
+const OG_IMAGE_URL = "/og/analytics?v=4";
 const OG_TITLE = "Analytics · pev";
 const OG_DESCRIPTION =
   "How Monad parallelizes. Chain-wide stats and the top contracts causing throughput contention over the last 7 days.";
