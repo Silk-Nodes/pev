@@ -107,19 +107,20 @@ export const metadata: Metadata = {
     description:
       "A developer tool for Monad. See exactly which storage slots are contended, and why.",
     siteName: "pev",
-    // Dynamic landing card. ?v=N is a cache-bust knob for Twitter/Discord
-    // (their preview caches are otherwise unbreakable). Bump when the
-    // card design changes OR when a social platform has cached an
-    // earlier broken state of the image that won't refresh on its own.
-    // History:
-    //   v=1, first dynamic landing card
-    //   v=4, post-design refresh
-    //   v=5, X's image fetcher stuck on a stale/empty cache for v=4 at
-    //        launch time, this bump gives X a URL it's never seen
-    //        before so it has to re-scrape from scratch
+    // Landing card. Originally dynamic at /api/og/landing?v=N, but
+    // X (Twitter) silently refused to render the dynamic PNG output
+    // (suspected cause: Next.js ImageResponse emits RGBA PNGs, and
+    // X's image fetcher has documented issues with the alpha channel
+    // even when every pixel is fully opaque). Switched to a static
+    // pre-rendered JPEG so X reliably picks it up. The JPEG is a
+    // captured snapshot of the dynamic card from launch time; if the
+    // numbers go stale, re-capture and replace the file. Internal
+    // pages (block, contract, tx) keep their dynamic per-page cards
+    // since the per-page data matters more than dynamic for the
+    // landing.
     images: [
       {
-        url: "/api/og/landing?v=5",
+        url: "/og-card.jpg",
         width: 1200,
         height: 630,
         alt: "pev: Is your contract killing parallelism?",
@@ -130,10 +131,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "pev: Is your contract killing parallelism?",
     description: "A parallel-execution visualizer for Monad. By Silk Nodes.",
-    // Match og:image cache-bust. X reads twitter:image when present and
-    // falls back to og:image; keeping them aligned avoids any ambiguity
-    // about which URL X will hit.
-    images: ["/api/og/landing?v=5"],
+    // Same static JPEG as og:image. X reads twitter:image when present
+    // and falls back to og:image; keeping them aligned removes any
+    // ambiguity about which URL X will hit.
+    images: ["/og-card.jpg"],
   },
 };
 
