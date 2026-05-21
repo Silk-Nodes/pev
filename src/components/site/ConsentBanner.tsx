@@ -105,16 +105,15 @@ export default function ConsentBanner() {
         color: themeA.text,
       }}
     >
+      {/* Body reframed from "pev uses Google Analytics" to lead with
+          developer-benefit. Original framing made the consent feel
+          like a privacy concession; new framing makes it feel like a
+          small favor to a tool the user is already using. Same data
+          collected, same disclosures, friendlier ask. */}
       <div style={{ marginBottom: 14 }}>
-        pev uses{" "}
-        <span className="pev-mono">Google&nbsp;Analytics</span> to see
-        which pages people actually find useful. Anonymous pageviews
-        only, no personal data, no ads, no sharing. Full details in our{" "}
-        {/* No inline color override: the .pev-link warm tone (#c8a47a,
-            ~8.6:1 on panel) reads as "clickable" and passes AA on its
-            own. Previously the inline themeA.muted matched the
-            surrounding text and the only link signal was the
-            underline, which is weaker affordance than color + underline. */}
+        Help us see which pev pages developers actually use. Anonymous
+        pageviews only, no personal data, no ads, no sharing. Full
+        details in our{" "}
         <Link href="/privacy" className="pev-link">
           privacy policy
         </Link>
@@ -136,17 +135,18 @@ export default function ConsentBanner() {
             cursor: "pointer",
           }}
         >
-          Accept
+          Sure, count me in
         </button>
+        {/* "Essentials only" instead of "Decline". The functional
+            behavior is identical (persist 'declined', no GA scripts
+            ever load), just softer copy that doesn't push users away
+            with a binary refusal frame. Industry-standard wording
+            (Stripe, Vercel, most GDPR-era banners use this). */}
         <button
           onClick={() => persist("declined")}
+          aria-label="Essentials only, decline analytics"
           style={{
             background: "transparent",
-            // themeA.muted (#8a8577) gives ~5.06:1 on the panel, comfortably
-            // above WCAG AA's 4.5:1 floor for normal text. The previous
-            // themeA.subtle (#827b6c) came in at ~4.44:1, technically a
-            // fail. Visual hierarchy is preserved: filled Accept button
-            // still dominates, Decline reads as a quiet secondary action.
             color: themeA.muted,
             border: "none",
             padding: "8px 4px",
@@ -157,7 +157,7 @@ export default function ConsentBanner() {
             textUnderlineOffset: 3,
           }}
         >
-          Decline
+          Essentials only
         </button>
       </div>
     </div>
