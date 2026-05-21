@@ -497,3 +497,42 @@ contracts:
     name: ""
     source: manual
     notes: "conflicts=0 txs=176,937"
+
+# ─── Manually-added labels (not necessarily in the top-100 list) ──
+# DEX infrastructure provided by maintainers. These are below the
+# auto-generated top-100 conflict cutoff but high-visibility enough
+# that anyone visiting pev would want them labeled (popular DEX
+# routers people share contract links for).
+
+  - address: 0x1b81d678ffb9c0263b24a97847620c99d213eb14
+    name: "PancakeSwap: SwapRouter"
+    source: manual
+    notes: "DEX router, provided by maintainer"
+  - address: 0x21114915ac6d5a2e156931e20b20b038ded0be7c
+    name: "PancakeSwap: SwapRouter v2"
+    source: manual
+    notes: "DEX router, provided by maintainer"
+  - address: 0x23682a588cf2601aca977df200938634c9f7d552
+    name: "PancakeSwap: Router"
+    source: manual
+    notes: "DEX router, provided by maintainer"
+  - address: 0x0b79d71ae99528d1db24a4148b5f4f865cc2b137
+    name: "Nad.fun: DEX Router"
+    source: manual
+    notes: "DEX router, provided by maintainer"
+  - address: 0x8986c8fd44eb85294a725a7e61af35e76ba26f91
+    name: "Nad.fun: V2 Router"
+    source: manual
+    notes: "Proxy / thin wrapper (326 bytecode chars), provided by maintainer"
+  - address: 0x6f6b8f1a20703309951a5127c45b49b1cd981a22
+    name: "Nad.fun: Bonding Curve Router"
+    source: manual
+    notes: "Memecoin launcher infra, provided by maintainer"
+  - address: 0xaebe5522749b65eae7b2a35c593145cc3128b515
+    name: "Nad.fun: LP Manager"
+    source: manual
+    notes: "Liquidity pool manager, provided by maintainer"
+  - address: 0x0d97dc33264bfc1c226207428a79b26757fb9dc3
+    name: "Uniswap: Universal Router"
+    source: manual
+    notes: "Provided by maintainer"
