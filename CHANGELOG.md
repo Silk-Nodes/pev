@@ -147,6 +147,19 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   "not found on Monad" message. Search placeholders updated on both
   the header and hero search boxes to mention "hash" generically
   instead of just "tx hash" so users know either kind works.
+- Switched landing OG card to a static JPEG (`/og-card.jpg`) instead
+  of the dynamic `/api/og/landing` route. X (Twitter) was silently
+  refusing to render the dynamic RGBA PNG even though every other
+  social platform handled it fine. Static JPEG renders correctly on X.
+- Dynamic OG card routes (contract, block, docs, analytics) now pipe
+  their PNG output through sharp and serve JPEG. Same root cause as
+  the landing card: Next.js's `ImageResponse` emits RGBA PNGs and X's
+  image fetcher rejects them silently. Added `sharp` as a dep and a
+  `lib/og/jpeg-response.ts` helper that wraps any ImageResponse. The
+  cost is ~20-40ms per render to do the format conversion, negligible
+  because the routes already cache at the Cloudflare edge. Now every
+  pev URL (landing + every per-page card) renders correctly on every
+  social platform we've tested (X, Discord, Telegram, Slack, LinkedIn).
 
 ### Fixed
 

@@ -30,6 +30,7 @@ import { resolveContract } from "@/lib/enrichment";
 import { loadCardFonts } from "@/lib/og/fonts";
 import { renderContractCard, type ContractCardData } from "@/lib/og/render";
 import { pickVariant } from "@/lib/og/variant";
+import { imageResponseAsJpeg } from "@/lib/og/jpeg-response";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -110,10 +111,16 @@ export async function GET(req: Request, ctx: RouteContext) {
         footer: { host, path: `/contract/${lower}` },
       };
 
-  return new ImageResponse(renderContractCard(cardData, variant), {
+  // Pipe the ImageResponse PNG through sharp → JPEG so X (Twitter)
+  // actually renders the preview. RGBA PNGs from Next.js's ImageResponse
+  // get silently rejected by X's image fetcher; JPEG works on every
+  // social platform we tested. See lib/og/jpeg-response.ts for details.
+  const png = new ImageResponse(renderContractCard(cardData, variant), {
     width: WIDTH,
     height: HEIGHT,
     fonts,
+  });
+  return imageResponseAsJpeg(png, {
     headers: {
       // Aggressive caching for social previews:
       //   • 5 min max-age: tells crawlers the card is fresh for 5 min

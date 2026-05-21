@@ -30,6 +30,7 @@ import { loadCardFonts } from "@/lib/og/fonts";
 import { renderBlockCard, type BlockCardData } from "@/lib/og/render";
 import { pickVariant } from "@/lib/og/variant";
 import type { PEVStatus } from "@/lib/probe-to-pev";
+import { imageResponseAsJpeg } from "@/lib/og/jpeg-response";
 
 // 1200×630 is the universal social-card aspect. Matches Twitter
 // summary_large_image, Discord, Slack, LinkedIn, all use this shape.
@@ -120,13 +121,16 @@ export async function GET(_req: Request, ctx: RouteContext) {
         footer,
       };
 
-  return new ImageResponse(renderBlockCard(cardData, variant), {
+  // PNG → JPEG so X renders the preview (see lib/og/jpeg-response.ts).
+  const png = new ImageResponse(renderBlockCard(cardData, variant), {
     width: WIDTH,
     height: HEIGHT,
     fonts,
+  });
+  return imageResponseAsJpeg(png, {
     headers: {
       // Finalized blocks are immutable. Tell every CDN + the social-media
-      // bot caches to keep this PNG forever. If we ever change the design,
+      // bot caches to keep this JPEG forever. If we ever change the design,
       // we bump the `?v=N` query param in the page metadata to force re-fetch.
       "cache-control": "public, max-age=31536000, immutable",
     },

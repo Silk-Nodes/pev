@@ -22,6 +22,7 @@ import { ImageResponse } from "next/og";
 import { loadCardFonts } from "@/lib/og/fonts";
 import { renderDocsCard, type DocsCardData } from "@/lib/og/render";
 import { pickVariant } from "@/lib/og/variant";
+import { imageResponseAsJpeg } from "@/lib/og/jpeg-response";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -47,10 +48,13 @@ export async function GET(req: Request) {
     footer: { host, path: "/docs" },
   };
 
-  return new ImageResponse(renderDocsCard(cardData, variant), {
+  // PNG → JPEG so X renders the preview (see lib/og/jpeg-response.ts).
+  const png = new ImageResponse(renderDocsCard(cardData, variant), {
     width: WIDTH,
     height: HEIGHT,
     fonts,
+  });
+  return imageResponseAsJpeg(png, {
     headers: {
       // /docs is rarely re-edited; 1-day cache with longer stale-while-
       // revalidate gives crawlers a fast first hit and absorbs any
