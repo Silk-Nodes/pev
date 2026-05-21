@@ -16,6 +16,7 @@ import { resolveContract } from "@/lib/enrichment";
 import { loadCardFonts } from "@/lib/og/fonts";
 import { renderAnalyticsCard, type AnalyticsCardData } from "@/lib/og/render";
 import { pickVariant } from "@/lib/og/variant";
+import { imageResponseAsJpeg } from "@/lib/og/jpeg-response";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
@@ -60,10 +61,13 @@ export async function GET(req: Request) {
     footer: { host, path: "/analytics" },
   };
 
-  return new ImageResponse(renderAnalyticsCard(cardData, variant), {
+  // PNG → JPEG so X renders the preview (see lib/og/jpeg-response.ts).
+  const png = new ImageResponse(renderAnalyticsCard(cardData, variant), {
     width: WIDTH,
     height: HEIGHT,
     fonts,
+  });
+  return imageResponseAsJpeg(png, {
     headers: {
       "cache-control": "public, max-age=300, stale-while-revalidate=600",
     },
