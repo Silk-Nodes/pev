@@ -160,6 +160,24 @@ the top. See `deploy/RELEASING.md` for the step-by-step process.
   because the routes already cache at the Cloudflare edge. Now every
   pev URL (landing + every per-page card) renders correctly on every
   social platform we've tested (X, Discord, Telegram, Slack, LinkedIn).
+- robots.txt rewritten with explicit per-bot Allow blocks for major
+  social-card scrapers (Twitterbot, facebookexternalhit, LinkedInBot,
+  Slackbot, Discordbot, TelegramBot). Twitter's card validator was
+  warning that the OG image URL "may be restricted by robots.txt"
+  because the previous file relied on the spec's "most specific match
+  wins" rule (Allow: /api/og/ overriding Disallow: /api/) which not
+  every parser honors. The wildcard rule is now also simpler: just
+  `Disallow: /api/v1/` (the actual raw-JSON data API), no broader
+  `/api/` rule for parsers to misinterpret. Per the spec, a bot
+  matching a specific User-agent block uses only that block's rules
+  and ignores the wildcard, so the explicit per-bot Allows guarantee
+  social scrapers can fetch /api/og/* with zero ambiguity.
+- X-Robots-Tag response header on /api/og/* changed from
+  "noindex, nofollow" to the default "index, follow,
+  max-image-preview:large". The previous noindex policy compounded
+  with the robots.txt Disallow to give conservative scrapers two
+  signals to skip the fetch. /api/v1/* (the actual private JSON API)
+  still gets noindex,nofollow as before.
 
 ### Fixed
 

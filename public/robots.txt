@@ -1,29 +1,45 @@
 # pev, Parallel Execution Visualizer for Monad
 # https://pev.silknodes.io
 #
-# Default-allow for everything that exists. We don't have any private
-# sections. Every page is read-only public chain data.
+# Default-allow for nearly everything. The only path we exclude is the
+# JSON data API at /api/v1/* — search engines should index the HTML
+# pages (/block/N, /contract/0x...) not raw JSON. The /api/og/*
+# OG-card route is implicitly allowed so social-preview scrapers
+# (Twitter, Discord, Telegram, Slack, LinkedIn, Facebook) can always
+# fetch link-preview images.
 #
-# Rules:
-#   • Allow /api/og/  , social previews (Twitter, Telegram, Discord,
-#                       Facebook) fetch our dynamic OG card images from
-#                       this prefix. Blocking it would break link
-#                       unfurling everywhere.
-#   • Disallow /api/  , the rest of /api/* returns JSON (block, tx,
-#                       contract, leaderboard, stats, etc.). These are
-#                       data endpoints, not browseable pages. Search
-#                       engines should index the HTML routes (/block/N,
-#                       /contract/0x..., etc.) instead, which we link to
-#                       from the JSON responses' Content-Location if
-#                       relevant.
+# We learned at launch that some robots.txt parsers (notably Twitter's)
+# don't implement the spec's "most-specific-match-wins" rule correctly:
+# they read top-to-bottom and treat a broad `Disallow: /api/` as
+# blocking everything under it, including /api/og/. Writing the rules
+# without overlapping patterns sidesteps that bug.
 #
-# Robots.txt rule precedence: the most-specific path match wins. So
-# `Allow: /api/og/` overrides `Disallow: /api/` for anything under
-# /api/og/, exactly the behavior we want.
+# Per-bot explicit allows below are defense-in-depth: per the robots.txt
+# spec, a crawler matching a specific User-agent block uses ONLY that
+# block's rules and ignores the wildcard. So a bot listed here is fully
+# governed by its own "Allow: /" and can't be confused by anything in
+# the wildcard section.
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
 
 User-agent: *
 Allow: /
-Allow: /api/og/
-Disallow: /api/
+Disallow: /api/v1/
 
 Sitemap: https://pev.silknodes.io/sitemap.xml
