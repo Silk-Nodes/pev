@@ -1,5 +1,5 @@
 /**
- * GET /api/og/block/[number]
+ * GET /og/block/[number]
  *
  * Returns a 1200×630 PNG OG card for a block, dynamically rendered with
  * the block's actual data (verdict, parallelism, conflicts, mini wave

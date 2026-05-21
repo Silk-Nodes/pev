@@ -1,5 +1,5 @@
 /**
- * GET /api/og/contract/[address]
+ * GET /og/contract/[address]
  *
  * Per-contract unfurl. Same shape as the block card (dark/cream variants
  * picked by hashing the address bytes), but the content is the

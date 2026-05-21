@@ -1,5 +1,5 @@
 /**
- * GET /api/og/analytics
+ * GET /og/analytics
  *
  * Unfurl for the /analytics page. Pulls the same precomputed payload
  * from analytics_cache (refreshed every 5 min by the systemd timer)

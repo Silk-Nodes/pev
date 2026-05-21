@@ -28,14 +28,17 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
   const n = parseBlockNumber(number);
   if (n === null) return { title: "Block not found" };
 
-  // Per-block social card. ?v=N is a cache-bust knob, bump it if we
-  // ever change the OG card design and want Twitter/Discord to re-fetch
-  // (their caches are otherwise unbreakable). See /api/og/block/[number].
-  // ?v=N is a cache-bust knob for Twitter/Discord (their preview caches
-  // are otherwise unbreakable). Bump when the OG card design changes.
-  // v=2 added the editorial footer band (URL + BY SILK NODES).
-  // v=3 dropped em-dashes from the verdict copy ("Clean, every tx" → "Clean. Every tx")
-  const ogImageUrl = `/api/og/block/${n}?v=5`;
+  // Per-block social card. Served from /og/* not /api/og/* because
+  // Twitter's card validator flags ANY image URL with /api/ in the
+  // path as "may be restricted by robots.txt" (heuristic check, not
+  // actual robots.txt enforcement), which manifests as no image
+  // preview in tweets. ?v=N is a cache-bust knob for X/Discord
+  // (their preview caches are otherwise unbreakable). Bump when the
+  // OG card design changes.
+  //   v=2 added the editorial footer band (URL + BY SILK NODES).
+  //   v=3 dropped em-dashes from the verdict copy.
+  //   v=6 moved route from /api/og/ to /og/ + JPEG output.
+  const ogImageUrl = `/og/block/${n}?v=6`;
   const title = `Monad block #${n.toLocaleString()} · pev`;
   const description =
     "Parallel-execution analysis: which transactions ran in parallel, which conflicted, and where the storage hotspots are.";
