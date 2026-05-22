@@ -11,6 +11,9 @@ import {
   type AnalyticsConflictKind,
   type AnalyticsWaveBucket,
   type AnalyticsStandoutBlock,
+  type AnalyticsRecentContract,
+  type AnalyticsVolumeContract,
+  type AnalyticsScoreBucket,
 } from "@/lib/indexer/store";
 import { resolveManyContracts, resolveManyMethods } from "@/lib/enrichment";
 import { themeA, palette } from "@/components/parallel/theme";
@@ -118,6 +121,12 @@ export default async function AnalyticsPage() {
     const allAddresses = [
       ...data.killers.map((k) => k.address),
       ...data.hotSlots.map((s) => s.contract),
+      // Include the new "freshly deployed" + "volume leaders" lists
+      // so their rows render with names where labels exist. Both are
+      // optional on the payload (older cached payloads won't have
+      // them) so we tolerate undefined.
+      ...(data.freshlyDeployed?.map((c) => c.address) ?? []),
+      ...(data.volumeLeaders?.map((c) => c.address) ?? []),
     ];
     const allSelectors = data.methods.map((m) => m.selector);
     try {
@@ -314,6 +323,74 @@ export default async function AnalyticsPage() {
         <WaveDepthCard buckets={data.waveDistribution} />
       </section>
 
+      {/* Score histogram: distribution of parallelism scores across
+          all blocks in the window. The "honest" companion to the
+          headline avgScore: averages can lie, distributions can't.
+          Lives next to the structural breakdowns since it's also a
+          chain-shape view. */}
+      {data.scoreHistogram && data.scoreHistogram.some((b) => b.blockCount > 0) && (
+        <section style={{ marginBottom: 48 }}>
+          <div className="pev-eyebrow" style={{ marginBottom: 6 }}>
+            Block score distribution
+          </div>
+          <p
+            style={{
+              fontSize: 13,
+              color: themeA.muted,
+              marginBottom: 18,
+              maxWidth: "62ch",
+              lineHeight: 1.5,
+            }}
+          >
+            How many blocks landed in each score bucket. The average is{" "}
+            <span style={{ color: themeA.text, fontFamily: themeA.mono }}>
+              {data.totals.avgScore}/100
+            </span>{" "}
+            but the{" "}
+            <em
+              style={{
+                fontFamily: themeA.serif,
+                fontStyle: "italic",
+                color: themeA.text,
+              }}
+            >
+              shape
+            </em>{" "}
+            tells the truth: most blocks are clean, a long tail is
+            what hurts.
+          </p>
+          <ScoreHistogramCard buckets={data.scoreHistogram} />
+        </section>
+      )}
+
+      {/* "Just deployed" — contracts new to the chain that already
+          broke into top-100 by activity. Editorial freshness signal:
+          every week this list has new names. */}
+      {data.freshlyDeployed && data.freshlyDeployed.length > 0 && (
+        <section style={{ marginBottom: 40 }}>
+          <div className="pev-eyebrow" style={{ marginBottom: 6 }}>
+            Just deployed, already active
+          </div>
+          <p
+            style={{
+              fontSize: 13,
+              color: themeA.muted,
+              marginBottom: 18,
+              maxWidth: "62ch",
+              lineHeight: 1.5,
+            }}
+          >
+            Contracts whose first on-chain transaction was within the last
+            7 days, ranked by total activity since deploy. The chain&rsquo;s
+            shape changes weekly; here&rsquo;s this week&rsquo;s movers.
+          </p>
+          <FreshlyDeployedList
+            contracts={data.freshlyDeployed}
+            names={contractNames}
+          />
+        </section>
+      )}
+
       {/* Killers leaderboard, contract-level */}
       <section style={{ marginBottom: 40 }}>
         <div className="pev-eyebrow" style={{ marginBottom: 6 }}>
@@ -333,6 +410,46 @@ export default async function AnalyticsPage() {
         </p>
         <KillersList killers={data.killers} names={killerNames} />
       </section>
+
+      {/* Volume leaders, the editorial contrast to killers. Sorting
+          contracts by usage rather than by contention reveals the
+          chain's workhorses, which often DON'T overlap with the
+          contention leaderboard above. */}
+      {data.volumeLeaders && data.volumeLeaders.length > 0 && (
+        <section style={{ marginBottom: 40 }}>
+          <div className="pev-eyebrow" style={{ marginBottom: 6 }}>
+            Top contracts by transaction volume
+          </div>
+          <p
+            style={{
+              fontSize: 13,
+              color: themeA.muted,
+              marginBottom: 18,
+              maxWidth: "62ch",
+              lineHeight: 1.5,
+            }}
+          >
+            The chain&rsquo;s workhorses, ranked by raw tx count over
+            all time pev has indexed. Compare to the contention leaderboard
+            above:{" "}
+            <em
+              style={{
+                fontFamily: themeA.serif,
+                fontStyle: "italic",
+                color: themeA.text,
+              }}
+            >
+              popular and contentious are different problems.
+            </em>{" "}
+            A well-designed contract can be #1 by usage without ever appearing
+            in the killer list.
+          </p>
+          <VolumeLeadersList
+            contracts={data.volumeLeaders}
+            names={contractNames}
+          />
+        </section>
+      )}
 
       {/* Hot slots leaderboard, storage-level granularity. Often
           surfaces the universal anti-pattern (slot 0 = global counter).
@@ -597,6 +714,317 @@ function StandoutBlockCard({
       </div>
     </Link>
   );
+}
+
+/**
+ * ScoreHistogramCard, horizontal bar histogram of parallelism score
+ * buckets (0-9, 10-19, ..., 90-100). Each row is a bucket with a
+ * proportional bar + block count + percentage share. Color-graded by
+ * the bucket midpoint so 90s read sage, 30s read terracotta.
+ *
+ * Editorial purpose: the "averages can lie" companion to the headline
+ * avgScore. Lets the reader see whether the chain is uniformly
+ * mediocre (centered distribution) or mostly excellent with a thin
+ * tail of bad blocks (skewed distribution).
+ */
+function ScoreHistogramCard({
+  buckets,
+}: {
+  buckets: AnalyticsScoreBucket[];
+}) {
+  // Find the largest count to scale the bar widths proportionally.
+  const maxCount = Math.max(1, ...buckets.map((b) => b.blockCount));
+
+  const colorFor = (bucket: number) => {
+    if (bucket >= 70) return themeA.status.clean;
+    if (bucket >= 40) return themeA.status.delayed;
+    return themeA.status.sourceText;
+  };
+
+  return (
+    <div
+      style={{
+        background: themeA.panel,
+        border: `1px solid ${themeA.border}`,
+        borderRadius: themeA.radius,
+        padding: 18,
+      }}
+    >
+      {buckets.map((b, i) => {
+        const widthPct = (b.blockCount / maxCount) * 100;
+        const sharePct = (b.share * 100).toFixed(b.share < 0.001 ? 3 : 1);
+        const color = colorFor(b.bucket);
+        const isLast = i === buckets.length - 1;
+        return (
+          <div
+            key={b.bucket}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "60px 1fr 96px",
+              gap: 14,
+              alignItems: "center",
+              paddingTop: i === 0 ? 0 : 10,
+              paddingBottom: isLast ? 0 : 10,
+              borderBottom: isLast ? "none" : `1px solid ${themeA.border}`,
+            }}
+          >
+            <span
+              className="pev-mono"
+              style={{
+                fontSize: 12,
+                color: themeA.muted,
+                textAlign: "right",
+              }}
+            >
+              {b.bucket === 90 ? "90-100" : `${b.bucket}-${b.bucket + 9}`}
+            </span>
+            {/* Bar track + filled portion */}
+            <div
+              style={{
+                position: "relative",
+                height: 18,
+                background: themeA.dim,
+                borderRadius: 2,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${Math.max(widthPct, b.blockCount > 0 ? 1 : 0)}%`,
+                  height: "100%",
+                  background: color,
+                  opacity: 0.85,
+                  transition: "width .3s",
+                }}
+              />
+            </div>
+            <span
+              className="pev-mono"
+              style={{
+                fontSize: 12,
+                color: themeA.text,
+                whiteSpace: "nowrap",
+                textAlign: "right",
+              }}
+            >
+              {b.blockCount.toLocaleString()}{" "}
+              <span style={{ color: themeA.subtle }}>
+                ({sharePct}%)
+              </span>
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * FreshlyDeployedList, list of contracts whose first-seen block is
+ * inside the recent window AND that already have meaningful activity.
+ * Same row pattern as KillersList: rank number, label or short hex,
+ * meta stats, click target on the whole row.
+ */
+function FreshlyDeployedList({
+  contracts,
+  names,
+}: {
+  contracts: AnalyticsRecentContract[];
+  names: Map<string, string | null>;
+}) {
+  if (contracts.length === 0) {
+    return (
+      <div style={{ color: themeA.muted, fontSize: 13 }}>
+        No new contracts broke into top activity this week.
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        background: themeA.panel,
+        border: `1px solid ${themeA.border}`,
+        borderRadius: themeA.radius,
+        overflow: "hidden",
+      }}
+    >
+      {contracts.map((c, i) => {
+        const name = names.get(c.address.toLowerCase()) ?? null;
+        const display = name ?? shortHex(c.address, 6, 4);
+        const ageLabel = ageToLabel(c.ageSeconds);
+        return (
+          <Link
+            key={c.address}
+            href={`/contract/${c.address}`}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "32px 1fr auto auto",
+              gap: 18,
+              alignItems: "center",
+              padding: "14px 20px",
+              borderBottom:
+                i < contracts.length - 1
+                  ? `1px solid ${themeA.border}`
+                  : "none",
+              textDecoration: "none",
+              color: themeA.text,
+            }}
+          >
+            <span
+              className="pev-mono"
+              style={{
+                fontSize: 12,
+                color: themeA.subtle,
+                letterSpacing: "0.05em",
+              }}
+            >
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span
+              style={{
+                fontFamily: name ? themeA.sans : themeA.mono,
+                fontSize: 14,
+                color: themeA.text,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={c.address}
+            >
+              {display}
+            </span>
+            <span
+              className="pev-mono"
+              style={{
+                fontSize: 12,
+                color: themeA.muted,
+                whiteSpace: "nowrap",
+              }}
+            >
+              <span style={{ color: themeA.text }}>
+                {c.txCount.toLocaleString()}
+              </span>{" "}
+              txs
+            </span>
+            <span
+              className="pev-mono"
+              style={{
+                fontSize: 11,
+                color: themeA.accent,
+                whiteSpace: "nowrap",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {ageLabel} new
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * VolumeLeadersList, top contracts by raw tx count. Visually
+ * parallel to KillersList so the contrast reads naturally; differs
+ * in the right-hand stat (txCount instead of conflicts) and in
+ * color treatment (no terracotta, since volume isn't bad).
+ */
+function VolumeLeadersList({
+  contracts,
+  names,
+}: {
+  contracts: AnalyticsVolumeContract[];
+  names: Map<string, string | null>;
+}) {
+  if (contracts.length === 0) {
+    return (
+      <div style={{ color: themeA.muted, fontSize: 13 }}>
+        No contracts with activity in the index.
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{
+        background: themeA.panel,
+        border: `1px solid ${themeA.border}`,
+        borderRadius: themeA.radius,
+        overflow: "hidden",
+      }}
+    >
+      {contracts.map((c, i) => {
+        const name = names.get(c.address.toLowerCase()) ?? null;
+        const display = name ?? shortHex(c.address, 6, 4);
+        return (
+          <Link
+            key={c.address}
+            href={`/contract/${c.address}`}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "32px 1fr auto",
+              gap: 18,
+              alignItems: "center",
+              padding: "14px 20px",
+              borderBottom:
+                i < contracts.length - 1
+                  ? `1px solid ${themeA.border}`
+                  : "none",
+              textDecoration: "none",
+              color: themeA.text,
+            }}
+          >
+            <span
+              className="pev-mono"
+              style={{
+                fontSize: 12,
+                color: themeA.subtle,
+                letterSpacing: "0.05em",
+              }}
+            >
+              {String(i + 1).padStart(2, "0")}
+            </span>
+            <span
+              style={{
+                fontFamily: name ? themeA.sans : themeA.mono,
+                fontSize: 14,
+                color: themeA.text,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={c.address}
+            >
+              {display}
+            </span>
+            <span
+              className="pev-mono"
+              style={{
+                fontSize: 14,
+                color: themeA.text,
+                whiteSpace: "nowrap",
+                fontWeight: 500,
+              }}
+            >
+              {c.txCount.toLocaleString()}{" "}
+              <span style={{ color: themeA.subtle, fontWeight: 400 }}>txs</span>
+            </span>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * ageToLabel, "2d" / "5h" / "12m" / "30s" age formatter. Used in
+ * the FreshlyDeployedList badge.
+ */
+function ageToLabel(seconds: number): string {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
+  return `${Math.round(seconds / 86400)}d`;
 }
 
 function Stat({

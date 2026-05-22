@@ -1242,6 +1242,52 @@ export interface AnalyticsStandout {
   worst: AnalyticsStandoutBlock | null;
 }
 
+/**
+ * Contract that first appeared on-chain within the recent window
+ * (default: last 7 days) and has already accumulated meaningful
+ * activity. Powers the "Just deployed" editorial section, which
+ * surfaces new entrants before they become permanent fixtures on
+ * the killer leaderboard.
+ */
+export interface AnalyticsRecentContract {
+  address: Hex;
+  firstBlock: number;
+  lastBlock: number;
+  txCount: number;
+  /**
+   * Approximate age in seconds since first_block. Computed in JS from
+   * block-number delta * MONAD_AVG_BLOCK_SECONDS so we don't have to
+   * JOIN blocks for the timestamp on every fetch.
+   */
+  ageSeconds: number;
+}
+
+/**
+ * Top contract by sheer transaction volume (most-used), distinct
+ * from "top by conflicts caused" (most-contentious). Editorial point:
+ * popular and bottlenecked are different lists. A well-designed
+ * contract can be #1 by usage and NOT in the killer top 10.
+ */
+export interface AnalyticsVolumeContract {
+  address: Hex;
+  txCount: number;
+  lastBlock: number;
+}
+
+/**
+ * One bucket of the parallelism-score distribution histogram. Reveals
+ * the SHAPE of the chain, not just the average: e.g. "78% of blocks
+ * score 80+, 0.3% score below 30" is much more honest than "average
+ * is 82".
+ */
+export interface AnalyticsScoreBucket {
+  /** Bucket floor: 0, 10, 20, ..., 90. Represents `bucket` to `bucket+9`. */
+  bucket: number;
+  blockCount: number;
+  /** Share of all blocks in the window, 0..1 */
+  share: number;
+}
+
 export interface AnalyticsData {
   /** Range covered by the main aggregates (chart, killers, kinds, waves) */
   windowFromBlock: number;
@@ -1275,6 +1321,23 @@ export interface AnalyticsData {
    * it; the page tolerates undefined.
    */
   standout?: AnalyticsStandout;
+  /**
+   * Contracts deployed in the last 7d that already broke the top-10
+   * by activity. The "watch this list" editorial signal. Optional for
+   * the same cache-tolerance reason as standout.
+   */
+  freshlyDeployed?: AnalyticsRecentContract[];
+  /**
+   * Top contracts by raw tx count over the window. Editorial contrast
+   * to `killers`, which sorts by conflicts-caused. Optional.
+   */
+  volumeLeaders?: AnalyticsVolumeContract[];
+  /**
+   * Distribution of parallelism scores across all blocks in the
+   * window, bucketed in tens (0-9, 10-19, ..., 90-100). Reveals
+   * the shape behind the average. Optional.
+   */
+  scoreHistogram?: AnalyticsScoreBucket[];
 }
 
 /**
@@ -1439,6 +1502,30 @@ export async function getAnalyticsData(
     conflict_count: number;
   }
 
+  // Freshly-deployed contracts: rows from contract_index whose
+  // first_block is inside the recent window AND tx_count >= minimum
+  // (filters out test deploys with one tx).
+  interface RecentContractRow {
+    contract: Buffer;
+    first_block: string;
+    last_block: string;
+    tx_count: string;
+  }
+
+  // Volume leaders: top contracts by tx_count in the index. No
+  // first_block filter; this is "most-active overall".
+  interface VolumeContractRow {
+    contract: Buffer;
+    tx_count: string;
+    last_block: string;
+  }
+
+  // Score histogram: parallelism_score bucketed in tens.
+  interface ScoreBucketRow {
+    bucket: number;
+    block_count: string;
+  }
+
   // Block count cap on the standout query. 24h on Monad mainnet at
   // ~0.5s block time is ~172,800 blocks. We bound the scan by block
   // number (last 200K blocks) instead of timestamp so the query uses
@@ -1447,10 +1534,16 @@ export async function getAnalyticsData(
   // representative of "today".
   const standoutFromBlock = Math.max(0, windowToBlock - 200_000);
 
-  // Run all 6 leaderboard/breakdown queries in parallel. They all
-  // share the same windowFromBlock literal so the planner uses the
-  // same range scan for every one. This is the post-rewrite version,
-  // no CTE-derived bounds anywhere.
+  // "Freshly deployed" cutoff. Same 7d window as the main aggregates.
+  // contract_index doesn't have a deploy_block exactly, but first_block
+  // is "first block we saw this contract in" which equals deploy block
+  // for any contract first seen by pev (or close to it for older ones).
+  const recentFromBlock = windowFromBlock;
+
+  // Run all 9 leaderboard/breakdown queries in parallel. They all
+  // share window bounds passed as JS literals (not CTE-derived) so
+  // the planner uses index range scans, not Seq Scans. Lesson learned
+  // the hard way last week.
   const [
     killerRows,
     hotSlotRows,
@@ -1458,6 +1551,9 @@ export async function getAnalyticsData(
     conflictKindRows,
     waveRows,
     standoutRows,
+    recentContractRows,
+    volumeContractRows,
+    scoreBucketRows,
   ] = await Promise.all([
     queryRows<KillerRow>(
       `SELECT contract,
@@ -1552,6 +1648,45 @@ export async function getAnalyticsData(
          LIMIT 1)`,
       [standoutFromBlock],
     ),
+    // Freshly-deployed contracts. first_block within the recent window,
+    // ordered by total activity. 100-tx floor filters out test deploys
+    // and single-use contracts. LIMIT 10 keeps the editorial list tight.
+    queryRows<RecentContractRow>(
+      `SELECT contract,
+              first_block::text,
+              last_block::text,
+              tx_count::text
+         FROM contract_index
+        WHERE first_block > $1
+          AND tx_count >= 100
+        ORDER BY tx_count DESC
+        LIMIT 10`,
+      [recentFromBlock],
+    ),
+    // Top contracts by tx volume (most-used, regardless of conflicts).
+    // The chain's "workhorse" list. We deliberately don't filter by
+    // window here, top-by-volume is a cumulative signal; filtering by
+    // recent activity would over-weight new launches.
+    queryRows<VolumeContractRow>(
+      `SELECT contract, tx_count::text, last_block::text
+         FROM contract_index
+        ORDER BY tx_count DESC
+        LIMIT 10`,
+      [],
+    ),
+    // Score distribution: bucket parallelism_score in tens (0, 10, 20,
+    // ..., 90) and count blocks per bucket. integer-divides handle the
+    // bucketing cheaply. ORDER BY DESC so the histogram renders 90 →
+    // 0 top-to-bottom (highest scores at the visual top).
+    queryRows<ScoreBucketRow>(
+      `SELECT (parallelism_score / 10) * 10 AS bucket,
+              count(*)::text AS block_count
+         FROM blocks
+        WHERE number > $1
+        GROUP BY bucket
+        ORDER BY bucket DESC`,
+      [windowFromBlock],
+    ),
   ]);
 
   const killers: AnalyticsKiller[] = killerRows.map((r) => ({
@@ -1627,6 +1762,58 @@ export async function getAnalyticsData(
     else if (r.kind === "worst") worst = block;
   }
 
+  // Freshly-deployed: compute age from block-number delta. Monad
+  // averages ~0.5s per block, so (windowToBlock - firstBlock) * 0.5
+  // is a good age estimate without an extra JOIN.
+  const MONAD_AVG_BLOCK_SECONDS = 0.5;
+  const freshlyDeployed: AnalyticsRecentContract[] = recentContractRows.map(
+    (r) => {
+      const firstBlock = parseInt(r.first_block, 10);
+      const lastBlock = parseInt(r.last_block, 10);
+      return {
+        address: bufferToHex(r.contract) as Hex,
+        firstBlock,
+        lastBlock,
+        txCount: parseInt(r.tx_count, 10),
+        ageSeconds: Math.max(
+          0,
+          Math.round((windowToBlock - firstBlock) * MONAD_AVG_BLOCK_SECONDS),
+        ),
+      };
+    },
+  );
+
+  const volumeLeaders: AnalyticsVolumeContract[] = volumeContractRows.map(
+    (r) => ({
+      address: bufferToHex(r.contract) as Hex,
+      txCount: parseInt(r.tx_count, 10),
+      lastBlock: parseInt(r.last_block, 10),
+    }),
+  );
+
+  // Score histogram: sum block counts for the share calculation, then
+  // fill in any missing buckets with zero so the chart has a stable
+  // shape (no gaps if the chain never produced blocks in a bucket).
+  const scoreTotal = scoreBucketRows.reduce(
+    (s, r) => s + parseInt(r.block_count, 10),
+    0,
+  );
+  const observedBuckets = new Map<number, number>();
+  for (const r of scoreBucketRows) {
+    observedBuckets.set(r.bucket, parseInt(r.block_count, 10));
+  }
+  // 90 → 0 step -10, so the chart renders top-to-bottom from best
+  // scores down to worst (the natural editorial reading order).
+  const scoreHistogram: AnalyticsScoreBucket[] = [];
+  for (let b = 90; b >= 0; b -= 10) {
+    const count = observedBuckets.get(b) ?? 0;
+    scoreHistogram.push({
+      bucket: b,
+      blockCount: count,
+      share: scoreTotal > 0 ? count / scoreTotal : 0,
+    });
+  }
+
   return {
     windowFromBlock,
     windowToBlock,
@@ -1644,6 +1831,9 @@ export async function getAnalyticsData(
     conflictKinds,
     waveDistribution,
     standout: { cleanest, worst },
+    freshlyDeployed,
+    volumeLeaders,
+    scoreHistogram,
   };
 }
 
