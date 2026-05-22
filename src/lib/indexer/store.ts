@@ -1192,6 +1192,15 @@ export interface AnalyticsMethod {
   conflictsCaused: number;
   /** Distinct blocks containing at least one call to this selector */
   blockCount: number;
+  /**
+   * Distinct entry contracts (contracts[1] in tx_executions) that
+   * received this method call. Tells the cross-contract story:
+   * "swap caused 42K conflicts across 12 different contracts" is a
+   * different signal than "swap caused 42K conflicts at one contract".
+   * Approximate (uses contracts[1] as a heuristic for "the contract
+   * this method was called on"), but accurate enough for the chart.
+   */
+  contractCount: number;
 }
 
 export interface AnalyticsConflictKind {
@@ -1399,6 +1408,7 @@ export async function getAnalyticsData(
     tx_count: string;
     conflicts: string;
     block_count: string;
+    contract_count: string;
   }
   // ─── conflict kinds breakdown ─────────────────────────────────
   // One row per kind (write_write / read_write / write_read). Tiny
@@ -1480,10 +1490,17 @@ export async function getAnalyticsData(
       [narrowWindowFromBlock],
     ),
     queryRows<MethodRow>(
+      // count(DISTINCT contracts[1]) is the cross-contract aggregation:
+      // "how many distinct contracts received this method call". Uses
+      // contracts[1] (the entry contract) as a heuristic; a method
+      // that propagates through multiple contracts via DELEGATECALL
+      // still counts as one contract here, which matches the editorial
+      // story ("swap is called on 12 different DEX entry points").
       `SELECT method_selector,
               count(*)::text                       AS tx_count,
               sum(outbound_conflicts)::text        AS conflicts,
-              count(DISTINCT block_number)::text   AS block_count
+              count(DISTINCT block_number)::text   AS block_count,
+              count(DISTINCT contracts[1])::text   AS contract_count
          FROM tx_executions
         WHERE block_number > $1
           AND method_selector IS NOT NULL
@@ -1557,6 +1574,7 @@ export async function getAnalyticsData(
     txCount: parseInt(r.tx_count, 10),
     conflictsCaused: parseInt(r.conflicts, 10),
     blockCount: parseInt(r.block_count, 10),
+    contractCount: parseInt(r.contract_count, 10) || 0,
   }));
 
   const totalKindCount = conflictKindRows.reduce(

@@ -254,9 +254,31 @@ export default async function AnalyticsPage() {
 
       {/* Daily chart */}
       <section style={{ marginBottom: 48 }}>
-        <div className="pev-eyebrow" style={{ marginBottom: 14 }}>
-          Daily parallelism
+        <div className="pev-eyebrow" style={{ marginBottom: 6 }}>
+          Daily parallelism vs. load
         </div>
+        <p
+          style={{
+            fontSize: 13,
+            color: themeA.muted,
+            marginBottom: 18,
+            maxWidth: "62ch",
+            lineHeight: 1.5,
+          }}
+        >
+          Bars are the chain&rsquo;s average parallelism score, day by
+          day. The orange line is daily transaction volume (right axis).
+          Together they answer:{" "}
+          <em
+            style={{
+              fontFamily: themeA.serif,
+              fontStyle: "italic",
+              color: themeA.text,
+            }}
+          >
+            does Monad parallelize worse under high load, or better?
+          </em>
+        </p>
         <DailyChart points={data.daily} />
       </section>
 
@@ -361,8 +383,29 @@ export default async function AnalyticsPage() {
             lineHeight: 1.5,
           }}
         >
-          The function selectors causing the most outbound conflicts, summed
-          across every contract that calls them. Resolved against{" "}
+          Function selectors causing the most outbound conflicts. The
+          contract count column tells the cross-contract story:{" "}
+          <em
+            style={{
+              fontFamily: themeA.serif,
+              fontStyle: "italic",
+              color: themeA.text,
+            }}
+          >
+            swap() across 12 different DEXes
+          </em>{" "}
+          is a category-wide pattern (the function shape itself is
+          contentious); the same conflict count concentrated on{" "}
+          <em
+            style={{
+              fontFamily: themeA.serif,
+              fontStyle: "italic",
+              color: themeA.text,
+            }}
+          >
+            1 contract
+          </em>{" "}
+          is one bad actor. Selectors resolved against{" "}
           <a
             href="https://www.4byte.directory/"
             className="pev-link"
@@ -584,9 +627,19 @@ function Stat({
 }
 
 /**
- * DailyChart, simple inline SVG bar chart. One bar per day, height
- * proportional to that day's average parallelism score (0-100), color
- * graded by score.
+ * DailyChart, simple inline SVG bar+line chart. Bars show that day's
+ * average parallelism score (0-100), color-graded by score. A line
+ * overlay shows daily transaction volume on a secondary y-axis,
+ * letting readers compare load against parallelism: does Monad
+ * parallelize WORSE under high load, or BETTER?
+ *
+ * Why one chart instead of two: the relationship between load and
+ * parallelism is the actually-interesting question. Two separate
+ * charts force the reader to switch back and forth; an overlay puts
+ * the comparison in one glance.
+ *
+ * Visual hierarchy: bars dominate (primary metric), line is quieter
+ * (ember tint, smaller dots) so the score story still leads.
  *
  * No charting library. Satori-friendly (server-rendered). Honest:
  * if a day has no blocks (gap in indexer), it just doesn't appear.
@@ -601,10 +654,12 @@ function DailyChart({ points }: { points: AnalyticsDayPoint[] }) {
   }
 
   // Layout, kept simple. Width responsive via viewBox; height fixed.
+  // PAD_R widened from 12 → 56 to accommodate the right-side secondary
+  // y-axis (tx volume labels).
   const W = 1000;
   const H = 240;
   const PAD_L = 40;
-  const PAD_R = 12;
+  const PAD_R = 56;
   const PAD_T = 12;
   const PAD_B = 38;
   const innerW = W - PAD_L - PAD_R;
@@ -649,6 +704,38 @@ function DailyChart({ points }: { points: AnalyticsDayPoint[] }) {
 
   // Three ticks on the auto-scaled axis: floor, midpoint, ceiling.
   const yTicks = [yMin, yMid, yMax];
+
+  // ─── Secondary axis: daily tx volume ─────────────────────────
+  // We render this as a line overlaid on the bars, with its own
+  // y-scale on the right side. The line is the "load" story; the
+  // bars are the "parallelism" story. Together they reveal whether
+  // high-load days correlate with lower parallelism.
+  const txCounts = points.map((p) => p.txCount);
+  const txMin = Math.min(...txCounts);
+  const txMax = Math.max(...txCounts);
+  // Tiny floor on the range so a flat-tx week doesn't render as a
+  // zero-height line at the baseline.
+  const txSpan = Math.max(1, txMax - txMin || 1);
+  // Map a tx count to a y-coordinate. We compress the line into the
+  // top 75% of the chart so it sits ABOVE most bar tops on a typical
+  // healthy chain (where bars are ~70-95). This keeps the line readable
+  // against the relatively quiet bar tops.
+  const txInnerH = innerH * 0.65;
+  const txOffsetY = PAD_T + (innerH - txInnerH);
+  const yForTx = (count: number) => {
+    const frac = (count - txMin) / txSpan;
+    return txOffsetY + txInnerH - frac * txInnerH;
+  };
+
+  // Compact tx-count format for the right-side axis labels.
+  // 1234567 → "1.2M"; 12345 → "12.3K"; 123 → "123".
+  const fmtCompact = (n: number): string => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, "")}K`;
+    return String(n);
+  };
+  const txMid = Math.round((txMin + txMax) / 2);
+  const txTicks = [txMin, txMid, txMax];
 
   // Format the day label as "Mon" "Tue" etc., from the YYYY-MM-DD string.
   // We treat the date as UTC (which matches how date_trunc('day', ts) groups).
@@ -763,6 +850,62 @@ function DailyChart({ points }: { points: AnalyticsDayPoint[] }) {
             </g>
           );
         })}
+
+        {/* ─── Tx volume overlay (secondary axis) ──────────────────
+            Right-side axis labels showing the min/mid/max tx volume
+            for the window. Quiet color so they don't compete with
+            the primary y-axis on the left. */}
+        {txTicks.map((tick, i) => {
+          const y = yForTx(tick);
+          return (
+            <text
+              key={`tx-tick-${i}`}
+              x={W - PAD_R + 8}
+              y={y + 4}
+              fontSize={11}
+              fontFamily={themeA.mono}
+              fill={themeA.subtle}
+              textAnchor="start"
+            >
+              {fmtCompact(tick)}
+            </text>
+          );
+        })}
+
+        {/* Connecting line through the daily tx counts. Drawn last so
+            it sits visually on top of the bars. */}
+        <polyline
+          points={points
+            .map(
+              (p, i) =>
+                `${PAD_L + i * (barW + barGap) + barW / 2},${yForTx(p.txCount)}`,
+            )
+            .join(" ")}
+          fill="none"
+          stroke={themeA.accent}
+          strokeWidth={1.5}
+          strokeOpacity={0.85}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Dots at each point so the line reads as "data", not
+            "decoration". Small (r=3) so they don't dominate. */}
+        {points.map((p, i) => {
+          const cx = PAD_L + i * (barW + barGap) + barW / 2;
+          const cy = yForTx(p.txCount);
+          return (
+            <circle
+              key={`tx-dot-${p.date}`}
+              cx={cx}
+              cy={cy}
+              r={3}
+              fill={themeA.accent}
+              stroke={themeA.panel}
+              strokeWidth={1.5}
+            />
+          );
+        })}
       </svg>
 
       <div
@@ -822,6 +965,22 @@ function DailyChart({ points }: { points: AnalyticsDayPoint[] }) {
           />
           {`< 40 `}
           <span style={{ color: themeA.muted }}>throughput-killer</span>
+        </span>
+        {/* Secondary line legend: tx volume overlay. Visually paired
+            with the right-axis labels in the chart. */}
+        <span>
+          <span
+            style={{
+              display: "inline-block",
+              width: 18,
+              height: 2,
+              background: themeA.accent,
+              marginRight: 6,
+              verticalAlign: "middle",
+              borderRadius: 1,
+            }}
+          />
+          <span style={{ color: themeA.muted }}>tx volume (right axis)</span>
         </span>
       </div>
     </div>
@@ -1154,20 +1313,24 @@ function MethodsList({
                 whiteSpace: "nowrap",
               }}
             >
+              {/* Cross-contract count is the editorial story: "this
+                  method is called on N different contracts". Surfaces
+                  whether contention is from one bad actor or a
+                  category-wide pattern (swap across all DEXes etc.). */}
+              <span style={{ color: themeA.text }}>
+                {m.contractCount.toLocaleString()}
+              </span>{" "}
+              contract{m.contractCount === 1 ? "" : "s"} ·{" "}
               <span style={{ color: themeA.text }}>
                 {m.txCount.toLocaleString()}
               </span>{" "}
-              txs ·{" "}
-              <span style={{ color: themeA.text }}>
-                {m.blockCount.toLocaleString()}
-              </span>{" "}
-              blocks
+              txs
             </span>
             <span
               className="pev-mono"
               style={{
                 fontSize: 14,
-                color: themeA.status.source,
+                color: themeA.status.sourceText,
                 whiteSpace: "nowrap",
                 fontWeight: 500,
               }}
