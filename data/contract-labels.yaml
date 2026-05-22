@@ -154,10 +154,9 @@ contracts:
     source: manual
     notes: "conflicts=328,679 txs=0"
   - address: 0x0198833561e4b64afa593cc3e90f446933ac2a9a
-    # TODO: research this address
-    name: ""
+    name: "Capricorn: MONI/WMON Pool (1%)"
     source: manual
-    notes: "conflicts=307,901 txs=0"
+    notes: "Capricorn CL pool (concentrated liquidity), token0=MONI, token1=WMON, fee=10000 bps (1%). Created by Capricorn CLFactory. conflicts=307,901 txs=1,212"
   - address: 0x188d586ddcf52439676ca21a244753fa19f9ea8e
     name: "Uniswap: PoolManager"
     source: manual
