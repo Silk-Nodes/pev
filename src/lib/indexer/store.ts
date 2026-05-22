@@ -1212,6 +1212,27 @@ export interface AnalyticsWaveBucket {
   share: number;
 }
 
+/**
+ * One block, surfaced as an editorial example on the analytics page.
+ * Used for the "cleanest block today" / "worst block today" pair so
+ * readers can click into a concrete example of either extreme.
+ */
+export interface AnalyticsStandoutBlock {
+  number: number;
+  hash: string;
+  timestamp: string; // ISO
+  txCount: number;
+  parallelismScore: number;
+  conflictCount: number;
+}
+
+export interface AnalyticsStandout {
+  /** Highest parallelism_score in the last 24h with tx_count >= 5. */
+  cleanest: AnalyticsStandoutBlock | null;
+  /** Lowest parallelism_score in the last 24h with tx_count >= 5. */
+  worst: AnalyticsStandoutBlock | null;
+}
+
 export interface AnalyticsData {
   /** Range covered by the main aggregates (chart, killers, kinds, waves) */
   windowFromBlock: number;
@@ -1238,6 +1259,13 @@ export interface AnalyticsData {
   conflictKinds: AnalyticsConflictKind[];
   /** Wave depth histogram, the "how parallel is Monad structurally" question */
   waveDistribution: AnalyticsWaveBucket[];
+  /**
+   * Two single-block examples for the "today's standout" editorial
+   * callouts. Optional so older cached payloads (pre-standout) don't
+   * break the deserialize on the page. New refreshes always populate
+   * it; the page tolerates undefined.
+   */
+  standout?: AnalyticsStandout;
 }
 
 /**
@@ -1388,7 +1416,28 @@ export async function getAnalyticsData(
     block_count: string;
   }
 
-  // Run all 5 leaderboard/breakdown queries in parallel. They all
+  // Standout-block lookup row shape. Single query returns up to two
+  // rows tagged "cleanest" or "worst"; we union them so the page only
+  // pays one round-trip for both editorial callouts.
+  interface StandoutRow {
+    kind: string; // "cleanest" | "worst"
+    number: string;
+    hash: Buffer;
+    timestamp: Date;
+    tx_count: number;
+    parallelism_score: number;
+    conflict_count: number;
+  }
+
+  // Block count cap on the standout query. 24h on Monad mainnet at
+  // ~0.5s block time is ~172,800 blocks. We bound the scan by block
+  // number (last 200K blocks) instead of timestamp so the query uses
+  // the PK index range scan directly. Slightly wider than 24h, but
+  // it's also faster and the worst/best within that window are still
+  // representative of "today".
+  const standoutFromBlock = Math.max(0, windowToBlock - 200_000);
+
+  // Run all 6 leaderboard/breakdown queries in parallel. They all
   // share the same windowFromBlock literal so the planner uses the
   // same range scan for every one. This is the post-rewrite version,
   // no CTE-derived bounds anywhere.
@@ -1398,6 +1447,7 @@ export async function getAnalyticsData(
     methodRows,
     conflictKindRows,
     waveRows,
+    standoutRows,
   ] = await Promise.all([
     queryRows<KillerRow>(
       `SELECT contract,
@@ -1460,6 +1510,31 @@ export async function getAnalyticsData(
         ORDER BY execution_depth ASC`,
       [windowFromBlock],
     ),
+    // Cleanest + worst block in the last ~24h. Two UNION'd selects so
+    // we get both rows in one round-trip. tx_count >= 5 filters out
+    // near-empty blocks that would trivially score 100/100 with no
+    // conflicts (not editorially interesting). Each tagged with kind
+    // so the result mapper knows which is which.
+    queryRows<StandoutRow>(
+      `WITH recent AS (
+         SELECT number, hash, timestamp, tx_count, parallelism_score, conflict_count
+           FROM blocks
+          WHERE number > $1
+            AND tx_count >= 5
+       )
+       (SELECT 'cleanest' AS kind, number::text, hash, timestamp,
+               tx_count, parallelism_score, conflict_count
+          FROM recent
+         ORDER BY parallelism_score DESC, tx_count DESC, number DESC
+         LIMIT 1)
+       UNION ALL
+       (SELECT 'worst', number::text, hash, timestamp,
+               tx_count, parallelism_score, conflict_count
+          FROM recent
+         ORDER BY parallelism_score ASC, conflict_count DESC, number DESC
+         LIMIT 1)`,
+      [standoutFromBlock],
+    ),
   ]);
 
   const killers: AnalyticsKiller[] = killerRows.map((r) => ({
@@ -1517,6 +1592,23 @@ export async function getAnalyticsData(
     }))
     .sort((a, b) => a.waves - b.waves);
 
+  // Map standout rows: tag by kind, keep null when the window had no
+  // qualifying blocks (e.g. early on a brand-new indexer install).
+  let cleanest: AnalyticsStandoutBlock | null = null;
+  let worst: AnalyticsStandoutBlock | null = null;
+  for (const r of standoutRows) {
+    const block: AnalyticsStandoutBlock = {
+      number: parseInt(r.number, 10),
+      hash: bufferToHex(r.hash),
+      timestamp: r.timestamp.toISOString(),
+      txCount: r.tx_count,
+      parallelismScore: r.parallelism_score,
+      conflictCount: r.conflict_count,
+    };
+    if (r.kind === "cleanest") cleanest = block;
+    else if (r.kind === "worst") worst = block;
+  }
+
   return {
     windowFromBlock,
     windowToBlock,
@@ -1533,6 +1625,7 @@ export async function getAnalyticsData(
     methods,
     conflictKinds,
     waveDistribution,
+    standout: { cleanest, worst },
   };
 }
 

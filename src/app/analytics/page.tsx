@@ -10,6 +10,7 @@ import {
   type AnalyticsMethod,
   type AnalyticsConflictKind,
   type AnalyticsWaveBucket,
+  type AnalyticsStandoutBlock,
 } from "@/lib/indexer/store";
 import { resolveManyContracts, resolveManyMethods } from "@/lib/enrichment";
 import { themeA, palette } from "@/components/parallel/theme";
@@ -259,6 +260,22 @@ export default async function AnalyticsPage() {
         <DailyChart points={data.daily} />
       </section>
 
+      {/* "Today's standout" editorial callouts: two concrete blocks
+          readers can click into for either extreme of the chain. We
+          tolerate missing standout data (older cached payloads pre-
+          this-field) by simply not rendering the section. */}
+      {data.standout?.cleanest && data.standout?.worst && (
+        <section style={{ marginBottom: 48 }}>
+          <div className="pev-eyebrow" style={{ marginBottom: 14 }}>
+            Today&rsquo;s standout blocks
+          </div>
+          <div className="pev-grid-two-col" style={{ gap: 20 }}>
+            <StandoutBlockCard kind="cleanest" block={data.standout.cleanest} />
+            <StandoutBlockCard kind="worst" block={data.standout.worst} />
+          </div>
+        </section>
+      )}
+
       {/* Chain-shape strip, two structural breakdowns side-by-side.
           Conflict kinds = "what type of contention dominates"; wave
           depth = "how parallel is the chain structurally". Both teach
@@ -428,6 +445,116 @@ export default async function AnalyticsPage() {
 /* ─────────────────────────────────────────────────────────────────
    Helper components, kept inline so the page reads top to bottom.
    ───────────────────────────────────────────────────────────────── */
+
+/**
+ * StandoutBlockCard, editorial callout pair for the analytics page.
+ * Renders one of two extremes from the last ~24h: the cleanest block
+ * (highest parallelism score) or the worst (lowest). Each card is
+ * a click target leading to the block page so readers can see what
+ * caused either extreme in concrete detail.
+ *
+ * Visual treatment differs by kind so a glance distinguishes them:
+ *   cleanest → sage-tinted border, "clean" status color on the score
+ *   worst    → terracotta-tinted border, "source" color on the score
+ * Both use the same panel background and editorial layout so the
+ * difference reads as "same UI, different verdict".
+ */
+function StandoutBlockCard({
+  kind,
+  block,
+}: {
+  kind: "cleanest" | "worst";
+  block: AnalyticsStandoutBlock;
+}) {
+  const isClean = kind === "cleanest";
+  const accentColor = isClean
+    ? themeA.status.clean
+    : themeA.status.sourceText;
+  const eyebrowText = isClean ? "Cleanest block, 24h" : "Worst block, 24h";
+  const tagline = isClean
+    ? "Every tx parallel, no contention. This is what the chain looks like at its best."
+    : "Heaviest contention in the window. Click through to see which contracts were fighting.";
+
+  // age relative to now, approximate
+  const ts = new Date(block.timestamp);
+  const ageSec = Math.max(0, Math.round((Date.now() - ts.getTime()) / 1000));
+  const ageLabel =
+    ageSec < 60
+      ? `${ageSec}s ago`
+      : ageSec < 3600
+        ? `${Math.round(ageSec / 60)}m ago`
+        : ageSec < 86400
+          ? `${Math.round(ageSec / 3600)}h ago`
+          : `${Math.round(ageSec / 86400)}d ago`;
+
+  return (
+    <Link
+      href={`/block/${block.number}`}
+      style={{
+        display: "block",
+        padding: "20px 22px",
+        background: themeA.panel,
+        // A 2px left-border in the kind color is the visual "verdict
+        // strip" without needing to color the whole card. Sits next to
+        // the standard border so the card still reads as a unified
+        // panel from any distance.
+        borderLeft: `3px solid ${accentColor}`,
+        border: `1px solid ${themeA.border}`,
+        borderLeftWidth: 3,
+        borderLeftColor: accentColor,
+        borderRadius: themeA.radius,
+        textDecoration: "none",
+        color: themeA.text,
+      }}
+    >
+      <div
+        className="pev-eyebrow"
+        style={{ color: themeA.subtle, marginBottom: 10 }}
+      >
+        {eyebrowText}
+      </div>
+      <div
+        className="pev-mono"
+        style={{
+          fontSize: 22,
+          color: themeA.text,
+          marginBottom: 6,
+        }}
+      >
+        #{block.number.toLocaleString()}
+      </div>
+      <div
+        className="pev-mono"
+        style={{
+          fontSize: 12,
+          color: themeA.muted,
+          marginBottom: 16,
+        }}
+      >
+        <span style={{ color: accentColor }}>
+          {block.parallelismScore}/100
+        </span>
+        {" · "}
+        {block.txCount} tx
+        {" · "}
+        {block.conflictCount} conf
+        {" · "}
+        {ageLabel}
+      </div>
+      <div
+        style={{
+          fontFamily: themeA.serif,
+          fontStyle: "italic",
+          fontSize: 14,
+          color: themeA.muted,
+          lineHeight: 1.5,
+        }}
+      >
+        {tagline}
+      </div>
+    </Link>
+  );
+}
 
 function Stat({
   label,
