@@ -569,3 +569,26 @@ contracts:
     source: erc20
     symbol: "AZNDAUSD"
     notes: "LP token pair, on-chain name() + symbol() confirmed"
+
+# ─── Third batch: oracles, bridges, MetaMask infra, ShMonad helper ──
+
+  - address: 0x3ef3d8ba38ebe18db133cec108f4d14ce00dd9ae
+    name: "Merkl: Merkl"
+    source: manual
+    notes: "Merkl rewards contract. Proxy (340 bytecode chars), provided by maintainer"
+  - address: 0xfb00d4ea6f3f0d0b4a57b32378075df408f2aaba
+    name: "MetaMask: Bridge"
+    source: manual
+    notes: "MetaMask bridge contract, provided by maintainer"
+  - address: 0xdb9b1e94b5b69df7e401ddbede43491141047db3
+    name: "MetaMask: DelegationManager"
+    source: manual
+    notes: "MetaMask delegation manager, provided by maintainer"
+  - address: 0x16f70cad28dd621b0072b5a8a8c392970e87c3dd
+    name: "Supra: SupraOraclePull"
+    source: manual
+    notes: "Supra oracle pull contract. Proxy (406 bytecode chars), provided by maintainer"
+  - address: 0xead55c44e10a352f72770027e4144a8ab872e119
+    name: "ShMonad"
+    source: manual
+    notes: "Deployed by ShMonad. No on-chain name() / specific function name known. Provided by maintainer."
