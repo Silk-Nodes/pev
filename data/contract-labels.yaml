@@ -561,3 +561,12 @@ contracts:
     name: "aPriori: Swap"
     source: manual
     notes: "aPriori swap contract, provided by maintainer"
+
+  # LP token, on-chain name() / symbol() confirm AZND/AUSD pair.
+  # Not in our auto-probe's top-100 list but worth labeling because
+  # users will visit /contract/<this> directly from monadvision links.
+  - address: 0x2d84d79c852f6842abe0304b70bbaa1506add457
+    name: "AZND/AUSD"
+    source: erc20
+    symbol: "AZNDAUSD"
+    notes: "LP token pair, on-chain name() + symbol() confirmed"
