@@ -592,3 +592,23 @@ contracts:
     name: "ShMonad"
     source: manual
     notes: "Deployed by ShMonad. No on-chain name() / specific function name known. Provided by maintainer."
+
+# ─── FoMonad protocol (FOMO3D-style game with per-cycle Vibecoin) ──
+# Three immutable contracts that together implement a last-buyer
+# countdown game. Designed for high contention by construction
+# (every buy() touches the same lastBuyer/timer/prizePool global
+# slots), which makes them textbook throughput-killer candidates in
+# pev's analysis. See https://fomonad.wtf for the whitepaper.
+
+  - address: 0x9f4834920e7ad3275f3cf6587ad9c9f7d387f1cf
+    name: "FoMonad: foMON Token"
+    source: manual
+    notes: "foMON ERC-20 (governance + dividend opt-in). 100M fixed supply, 80M deployer pre-mine. On-chain name()='FoMonad'. Provided by maintainer."
+  - address: 0xd2c45789a6a26cbb961e7e1b65fa2b5bb3872639
+    name: "FoMonad: Game"
+    source: manual
+    notes: "FoMonadGame.sol, the main FOMO3D-style game engine. Every buy() updates lastBuyer + prizePool + timer (single global slots), classic high-contention pattern by design. Provided by maintainer."
+  - address: 0xad269fbec6ebbad424fcdc0f8e62f2056a72b403
+    name: "FoMonad: Vibecoin (impl)"
+    source: manual
+    notes: "Vibecoin.sol implementation contract. Minimal-proxy-cloned at the start of each game cycle, so direct activity is ~0; the per-cycle clones at other addresses do the work. Provided by maintainer."
