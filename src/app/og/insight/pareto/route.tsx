@@ -1,14 +1,22 @@
 /**
  * GET /og/insight/pareto
  *
- * Static-data Pareto insight card: "6 contracts cause 81% of all
- * storage conflicts on Monad". Renders as 1200x630 JPEG for sharing
- * on X / Discord / Telegram.
+ * Pareto insight card: "6 contracts cause 81% of all storage conflicts on Monad".
  *
- * Data is snapshot at the time of writing (post-launch week 1).
- * Designed to be a permanent shareable URL — the numbers don't need
- * to be live, the FINDING is what's shareable. If we want to refresh
- * later, regenerate the snapshot and update the constants below.
+ * Default response: 1200x630 JPEG. Suitable for og:image embedding and X tweet
+ * cards (X re-encodes anyway, no point sending HD by default).
+ *
+ * Query params for high-res / lossless downloads:
+ *   ?w=N        Width in pixels, height auto-derived at 1200:630 aspect ratio.
+ *               Min 800, max 6000. Default 1200. Scales every element
+ *               proportionally so text stays crisp at any resolution.
+ *   ?format=png Override to PNG output. Default JPEG.
+ *
+ * Examples for sharing:
+ *   /og/insight/pareto                 (1200x630 JPEG, ~50KB, OG embed)
+ *   /og/insight/pareto?w=2400          (2x retina JPEG)
+ *   /og/insight/pareto?w=4800          (4K-ish JPEG, ~600KB)
+ *   /og/insight/pareto?w=4800&format=png  (4K-ish lossless PNG, ~1-2MB)
  */
 
 import { ImageResponse } from "next/og";
@@ -17,18 +25,24 @@ import { renderInsightCard, type InsightCardData } from "@/lib/og/render";
 import { pickVariant } from "@/lib/og/variant";
 import { imageResponseAsJpeg } from "@/lib/og/jpeg-response";
 
-const WIDTH = 1200;
-const HEIGHT = 630;
+const BASE_WIDTH = 1200;
+const BASE_HEIGHT = 630;
+const MIN_WIDTH = 800;
+const MAX_WIDTH = 6000;
 
 export const runtime = "nodejs";
 
 export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const requestedW = parseInt(url.searchParams.get("w") || String(BASE_WIDTH), 10);
+  const w = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, Number.isFinite(requestedW) ? requestedW : BASE_WIDTH));
+  const h = Math.round((w * BASE_HEIGHT) / BASE_WIDTH);
+  const scale = w / BASE_WIDTH;
+  const wantsPng = url.searchParams.get("format") === "png";
+
   const host = publicHostFrom(req);
   const fonts = await loadCardFonts();
-
-  // Dark variant always for this card (the finding reads more dramatic
-  // on dark; the cream variant is for editorial pages).
-  const variant = pickVariant(0); // 0 → dark per pickVariant convention
+  const variant = pickVariant(0); // dark, the more dramatic of the two variants
 
   const cardData: InsightCardData = {
     eyebrow: "FINDING · MONAD MAINNET",
@@ -48,15 +62,33 @@ export async function GET(req: Request) {
     footer: { host, path: "/analytics" },
   };
 
-  const png = new ImageResponse(renderInsightCard(cardData, variant), {
-    width: WIDTH,
-    height: HEIGHT,
+  const png = new ImageResponse(renderInsightCard(cardData, variant, scale), {
+    width: w,
+    height: h,
     fonts,
   });
+
+  // PNG passthrough: return the ImageResponse PNG directly. Used for HD
+  // downloads where lossless quality matters more than X-image-fetcher
+  // compatibility (RGBA is fine when the user is just saving the file).
+  if (wantsPng) {
+    const buf = await png.arrayBuffer();
+    return new Response(buf, {
+      status: 200,
+      headers: {
+        "content-type": "image/png",
+        "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
+        "content-disposition": `inline; filename="pev-pareto-${w}.png"`,
+      },
+    });
+  }
+
+  // JPEG path (default): runs through sharp for RGB conversion + JPEG
+  // compression. Slightly smaller files, broadly compatible.
   return imageResponseAsJpeg(png, {
     headers: {
-      // Insight cards are evergreen, cache aggressively.
       "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
+      "content-disposition": `inline; filename="pev-pareto-${w}.jpg"`,
     },
   });
 }

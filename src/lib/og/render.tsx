@@ -1286,11 +1286,22 @@ export interface InsightCardData {
   footer: { host: string; path: string };
 }
 
+/**
+ * Render the insight card at an arbitrary scale factor. scale=1 produces
+ * the 1200x630 default; scale=4 produces a 4800x2520 high-DPI version
+ * that stays crisp on retina displays and is suitable for download.
+ * All numeric sizes inside (fontSize, padding, gaps, dimensions) are
+ * multiplied by `scale` so the layout proportions stay identical at any
+ * resolution. Lockup is the only exception, it has its own hardcoded
+ * sizing baked in (shared with all other card types).
+ */
 export function renderInsightCard(
   data: InsightCardData,
   variant: CardVariant,
+  scale: number = 1,
 ): React.ReactElement {
   const c = colorsFor(variant);
+  const s = (n: number) => Math.round(n * scale);
   return (
     <div
       style={{
@@ -1301,7 +1312,7 @@ export function renderInsightCard(
         background: c.bg,
         color: c.text,
         fontFamily: "Inter Tight",
-        padding: "48px 56px",
+        padding: `${s(48)}px ${s(56)}px`,
       }}
     >
       {/* Top: lockup + eyebrow */}
@@ -1313,14 +1324,26 @@ export function renderInsightCard(
           width: "100%",
         }}
       >
-        <Lockup colors={c} />
+        {/* Lockup wraps its child mark+wordmark at fixed pixel sizes;
+            for scale>1 we wrap it in a transform-scale container so it
+            grows proportionally without us having to thread scale into
+            the shared Lockup component. */}
+        <div
+          style={{
+            display: "flex",
+            transform: scale === 1 ? undefined : `scale(${scale})`,
+            transformOrigin: "left center",
+          }}
+        >
+          <Lockup colors={c} />
+        </div>
         <div
           style={{
             display: "flex",
             flexDirection: "column",
             alignItems: "flex-end",
             fontFamily: "JetBrains Mono",
-            fontSize: 12,
+            fontSize: s(12),
             color: c.subtle,
             letterSpacing: "0.18em",
           }}
@@ -1329,16 +1352,16 @@ export function renderInsightCard(
         </div>
       </div>
 
-      <div style={{ width: "100%", height: 1, background: c.line, marginTop: 24 }} />
+      <div style={{ width: "100%", height: s(1), background: c.line, marginTop: s(24) }} />
 
       {/* Two-column body: big number left, list right */}
       <div
         style={{
           display: "flex",
           flex: 1,
-          marginTop: 28,
+          marginTop: s(28),
           alignItems: "flex-start",
-          gap: 40,
+          gap: s(40),
         }}
       >
         {/* Left: headline + subline */}
@@ -1346,14 +1369,14 @@ export function renderInsightCard(
           style={{
             display: "flex",
             flexDirection: "column",
-            flex: "0 0 430px",
+            flex: `0 0 ${s(430)}px`,
           }}
         >
           <div
             style={{
               fontFamily: "Instrument Serif",
               fontStyle: "italic",
-              fontSize: 180,
+              fontSize: s(180),
               lineHeight: 0.9,
               color: c.ember,
               letterSpacing: "-0.03em",
@@ -1365,10 +1388,10 @@ export function renderInsightCard(
             style={{
               fontFamily: "Instrument Serif",
               fontStyle: "italic",
-              fontSize: 28,
+              fontSize: s(28),
               color: c.text,
               lineHeight: 1.25,
-              marginTop: 18,
+              marginTop: s(18),
             }}
           >
             {data.subline}
@@ -1382,7 +1405,7 @@ export function renderInsightCard(
             flexDirection: "column",
             flex: 1,
             fontFamily: "JetBrains Mono",
-            fontSize: 18,
+            fontSize: s(18),
           }}
         >
           {data.rows.map((r, i) => (
@@ -1391,21 +1414,21 @@ export function renderInsightCard(
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 14,
-                paddingTop: i === 0 ? 0 : 12,
-                paddingBottom: 12,
+                gap: s(14),
+                paddingTop: i === 0 ? 0 : s(12),
+                paddingBottom: s(12),
                 borderBottom:
                   i < data.rows.length - 1
-                    ? `1px solid ${c.line}`
+                    ? `${Math.max(1, s(1))}px solid ${c.line}`
                     : "none",
               }}
             >
               <span
                 style={{
                   color: c.subtle,
-                  fontSize: 14,
+                  fontSize: s(14),
                   letterSpacing: "0.05em",
-                  width: 28,
+                  width: s(28),
                 }}
               >
                 {String(r.rank).padStart(2, "0")}
@@ -1418,7 +1441,7 @@ export function renderInsightCard(
                   whiteSpace: "nowrap",
                   textOverflow: "ellipsis",
                   fontFamily: "Inter Tight",
-                  fontSize: 18,
+                  fontSize: s(18),
                 }}
               >
                 {r.name}
@@ -1426,10 +1449,10 @@ export function renderInsightCard(
               <span
                 style={{
                   color: c.ember,
-                  fontSize: 18,
+                  fontSize: s(18),
                   fontWeight: 500,
                   whiteSpace: "nowrap",
-                  marginLeft: 8,
+                  marginLeft: s(8),
                 }}
               >
                 {r.metric}
@@ -1439,9 +1462,9 @@ export function renderInsightCard(
           <div
             style={{
               fontFamily: "JetBrains Mono",
-              fontSize: 12,
+              fontSize: s(12),
               color: c.subtle,
-              marginTop: 18,
+              marginTop: s(18),
               letterSpacing: "0.05em",
               lineHeight: 1.5,
             }}
@@ -1451,7 +1474,24 @@ export function renderInsightCard(
         </div>
       </div>
 
-      <FooterBand colors={c} host={data.footer.host} path={data.footer.path} />
+      {/* Scaled footer (inlined rather than using the shared FooterBand
+          so it picks up the scale factor without forcing every other
+          card type to plumb scale through). */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: s(32),
+          fontFamily: "JetBrains Mono",
+          fontSize: s(14),
+          color: c.subtle,
+          letterSpacing: "0.16em",
+        }}
+      >
+        <span>{`${data.footer.host}${data.footer.path}`}</span>
+        <span>BY SILK NODES</span>
+      </div>
     </div>
   );
 }
