@@ -1259,3 +1259,199 @@ export function renderDocsCard(
     </div>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════
+   INSIGHT CARD, one-off shareable findings (Pareto, anomalies, etc.)
+   Reusable as we surface more interesting data over time.
+   ════════════════════════════════════════════════════════════════ */
+
+export interface InsightRow {
+  rank: number;
+  name: string;
+  pct: number;
+  metric: string;
+}
+
+export interface InsightCardData {
+  /** Big-number headline, e.g. "81%" */
+  headline: string;
+  /** Subline below the headline */
+  subline: string;
+  /** Top-N list rows */
+  rows: InsightRow[];
+  /** Eyebrow above headline, e.g. "FINDING · 22 DAYS OF MONAD MAINNET" */
+  eyebrow: string;
+  /** Small contextual line below the list, e.g. "Across 44.3M conflicts, 11,865 contracts" */
+  caption: string;
+  footer: { host: string; path: string };
+}
+
+export function renderInsightCard(
+  data: InsightCardData,
+  variant: CardVariant,
+): React.ReactElement {
+  const c = colorsFor(variant);
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: c.bg,
+        color: c.text,
+        fontFamily: "Inter Tight",
+        padding: "48px 56px",
+      }}
+    >
+      {/* Top: lockup + eyebrow */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
+        }}
+      >
+        <Lockup colors={c} />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            fontFamily: "JetBrains Mono",
+            fontSize: 12,
+            color: c.subtle,
+            letterSpacing: "0.18em",
+          }}
+        >
+          <span>{data.eyebrow}</span>
+        </div>
+      </div>
+
+      <div style={{ width: "100%", height: 1, background: c.line, marginTop: 24 }} />
+
+      {/* Two-column body: big number left, list right */}
+      <div
+        style={{
+          display: "flex",
+          flex: 1,
+          marginTop: 28,
+          alignItems: "flex-start",
+          gap: 40,
+        }}
+      >
+        {/* Left: headline + subline */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: "0 0 430px",
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "Instrument Serif",
+              fontStyle: "italic",
+              fontSize: 180,
+              lineHeight: 0.9,
+              color: c.ember,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            {data.headline}
+          </div>
+          <div
+            style={{
+              fontFamily: "Instrument Serif",
+              fontStyle: "italic",
+              fontSize: 28,
+              color: c.text,
+              lineHeight: 1.25,
+              marginTop: 18,
+            }}
+          >
+            {data.subline}
+          </div>
+        </div>
+
+        {/* Right: ranked list */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            fontFamily: "JetBrains Mono",
+            fontSize: 18,
+          }}
+        >
+          {data.rows.map((r, i) => (
+            <div
+              key={r.rank}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 14,
+                paddingTop: i === 0 ? 0 : 12,
+                paddingBottom: 12,
+                borderBottom:
+                  i < data.rows.length - 1
+                    ? `1px solid ${c.line}`
+                    : "none",
+              }}
+            >
+              <span
+                style={{
+                  color: c.subtle,
+                  fontSize: 14,
+                  letterSpacing: "0.05em",
+                  width: 28,
+                }}
+              >
+                {String(r.rank).padStart(2, "0")}
+              </span>
+              <span
+                style={{
+                  color: c.text,
+                  flex: 1,
+                  overflow: "hidden",
+                  whiteSpace: "nowrap",
+                  textOverflow: "ellipsis",
+                  fontFamily: "Inter Tight",
+                  fontSize: 18,
+                }}
+              >
+                {r.name}
+              </span>
+              <span
+                style={{
+                  color: c.ember,
+                  fontSize: 18,
+                  fontWeight: 500,
+                  whiteSpace: "nowrap",
+                  marginLeft: 8,
+                }}
+              >
+                {r.metric}
+              </span>
+            </div>
+          ))}
+          <div
+            style={{
+              fontFamily: "JetBrains Mono",
+              fontSize: 12,
+              color: c.subtle,
+              marginTop: 18,
+              letterSpacing: "0.05em",
+              lineHeight: 1.5,
+            }}
+          >
+            {data.caption}
+          </div>
+        </div>
+      </div>
+
+      <FooterBand colors={c} host={data.footer.host} path={data.footer.path} />
+    </div>
+  );
+}
