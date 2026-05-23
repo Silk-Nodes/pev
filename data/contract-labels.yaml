@@ -612,3 +612,24 @@ contracts:
     name: "FoMonad: Vibecoin (impl)"
     source: manual
     notes: "Vibecoin.sol implementation contract. Minimal-proxy-cloned at the start of each game cycle, so direct activity is ~0; the per-cycle clones at other addresses do the work. Provided by maintainer."
+
+# ─── Perpl backend infrastructure (identified via bytecode forensics) ──
+# These three contracts form Perpl's settlement/oracle backend. Identified
+# by: (1) 80,671 exact co-occurrences with Perpl (0x34b6552d…) in the same
+# txs, (2) authorizedSenders(address) Chainlink Operator pattern on the hub,
+# (3) shared bytecode selectors across both helpers, (4) operator EOA
+# (0x0ec16D73…) with 194K lifetime txs that owns the hub. Not visible on
+# monadvision because they're not user-facing; users only see Perpl itself.
+
+  - address: 0x8d66a43fa9d0ff4929b9d36437a8371f5d113095
+    name: "Perpl: Oracle / Operator Hub"
+    source: manual
+    notes: "Perpl's backend oracle/operator contract. Chainlink-pattern: owner+paused+authorizedSenders. Owned by 0x0ec16D73… (Perpl operator EOA, 194K lifetime txs). 14.7KB, 1.2M conflicts caused. Identified via 80,671 exact co-occurrences with Perpl (0x34b6552d…) in the same transactions."
+  - address: 0xc8689a475b9d2cc5a21270842f5867a2d762ee79
+    name: "Perpl: Settlement / Helper"
+    source: manual
+    notes: "Perpl's thin (1.4KB) settlement/helper contract. Shares distinctive selectors with the Oracle Hub (0x8D66A43f…) and appears in the same transactions 80,671 times. Identified via co-occurrence pattern with Perpl + Hub."
+  - address: 0xff7b68ae2edf9b87178570a2384097a99520e97e
+    name: "Perpl: Backend (auxiliary)"
+    source: manual
+    notes: "Third Perpl backend contract. 80,601 co-occurrences with the Oracle Hub (0x8D66A43f…) in the same transactions. Function not yet identified beyond 'part of the Perpl backend stack'."
