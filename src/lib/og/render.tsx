@@ -1325,13 +1325,16 @@ export function renderInsightCard(
         }}
       >
         {/* Lockup wraps its child mark+wordmark at fixed pixel sizes;
-            for scale>1 we wrap it in a transform-scale container so it
-            grows proportionally without us having to thread scale into
-            the shared Lockup component. */}
+            we wrap it in a transform-scale container so it grows
+            proportionally without us having to thread scale into the
+            shared Lockup component. Always apply transform (even at
+            scale=1, scale(1) is a visual no-op) because Satori errors
+            500 if transformOrigin is set without a corresponding
+            transform value. */}
         <div
           style={{
             display: "flex",
-            transform: scale === 1 ? undefined : `scale(${scale})`,
+            transform: `scale(${scale})`,
             transformOrigin: "left center",
           }}
         >
