@@ -633,3 +633,18 @@ contracts:
     name: "Perpl: Backend (auxiliary)"
     source: manual
     notes: "Third Perpl backend contract. 80,601 co-occurrences with the Oracle Hub (0x8D66A43f…) in the same transactions. Function not yet identified beyond 'part of the Perpl backend stack'."
+
+  # Anago token (ERC20) + its WMON/ANAGO Capricorn CL pool.
+  # Surfaced because the pool was in the throughput-killer leaderboard
+  # under raw hex; on-chain probe of token0/token1/fee revealed the
+  # pair (Wrapped MON × Anago at 1% fee). Adding both the token and
+  # the pool so users clicking through from analytics see real names.
+  - address: 0x5df178c7e58046bc9074782fef0009c6be167777
+    name: "Anago"
+    source: erc20
+    symbol: "Anago"
+    notes: "ERC20 token, on-chain name()=symbol()='Anago'. Paired with WMON in a Capricorn CL pool at 0x2c492d8b…"
+  - address: 0x2c492d8b6b103be68df5ec37e709750ae3d3444e
+    name: "Capricorn: WMON/Anago Pool (1%)"
+    source: manual
+    notes: "Capricorn CL pool. token0=WMON (0x3bd359c1…), token1=Anago (0x5df178c7…), fee=10000 bps (1%). Created by Capricorn CLFactory. Same pattern as the earlier MONI/WMON pool at 0x0198833561…"
