@@ -648,3 +648,14 @@ contracts:
     name: "Capricorn: WMON/Anago Pool (1%)"
     source: manual
     notes: "Capricorn CL pool. token0=WMON (0x3bd359c1…), token1=Anago (0x5df178c7…), fee=10000 bps (1%). Created by Capricorn CLFactory. Same pattern as the earlier MONI/WMON pool at 0x0198833561…"
+
+  # Capricorn WMON/SHARKIE pool + SHARKIE token (third Capricorn pool).
+  - address: 0x6a13bfcba882fb86e5820dc4d160460ad8827777
+    name: "SHARKIE"
+    source: erc20
+    symbol: "SHARKIE"
+    notes: "ERC20 token, on-chain name()=symbol()='SHARKIE'. Memecoin paired with WMON in Capricorn CL pool 0x139aabfa…"
+  - address: 0x139aabfa1caab845c3333bf22dc3054a6e5e382b
+    name: "Capricorn: WMON/SHARKIE Pool (1%)"
+    source: manual
+    notes: "Capricorn CL pool. token0=WMON (0x3bd359c1…), token1=SHARKIE (0x6a13bfcb…), fee=10000 bps (1%). Created by Capricorn CLFactory."
