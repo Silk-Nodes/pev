@@ -1498,3 +1498,256 @@ export function renderInsightCard(
     </div>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════
+   DELTA CARD, before/after comparison findings (e.g. "X improved by Y%")
+   Companion to InsightCard. Same scale-aware design, different layout.
+   ════════════════════════════════════════════════════════════════ */
+
+export interface DeltaCardData {
+  /** Big-number headline, e.g. "−12.5%" */
+  headline: string;
+  /** Subline below the headline, short editorial framing */
+  subline: string;
+  /** Eyebrow above the lockup divider, e.g. "FINDING · MONAD MAINNET · WEEK OF MAY 23" */
+  eyebrow: string;
+  /** Top of comparison: label + 1-2 stat lines (e.g. ["4.26M conflicts", "12.4 per block"]) */
+  before: { label: string; stats: string[] };
+  /** Bottom of comparison: same shape, the recent state */
+  after: { label: string; stats: string[] };
+  /** Net change line at the bottom (e.g. "−980K conflicts in 7 days. Engineering working.") */
+  caption: string;
+  footer: { host: string; path: string };
+}
+
+/**
+ * Renders a comparison-style insight card: big delta on the left,
+ * before/after blocks on the right, caption underneath. Use for any
+ * "X improved/changed by Y%" finding where the story is the change
+ * itself, not a ranking.
+ *
+ * Same scale-aware pattern as renderInsightCard: pass scale=4 for
+ * 4K-ish (4800x2520) downloads, scale=1 for the default 1200x630 OG.
+ */
+export function renderDeltaCard(
+  data: DeltaCardData,
+  variant: CardVariant,
+  scale: number = 1,
+): React.ReactElement {
+  const c = colorsFor(variant);
+  const s = (n: number) => Math.round(n * scale);
+
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: c.bg,
+        color: c.text,
+        fontFamily: "Inter Tight",
+        padding: `${s(48)}px ${s(56)}px`,
+      }}
+    >
+      {/* Top: lockup + eyebrow */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          width: "100%",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            transform: `scale(${scale})`,
+            transformOrigin: "left center",
+          }}
+        >
+          <Lockup colors={c} />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            fontFamily: "JetBrains Mono",
+            fontSize: s(12),
+            color: c.subtle,
+            letterSpacing: "0.18em",
+          }}
+        >
+          <span>{data.eyebrow}</span>
+        </div>
+      </div>
+
+      <div style={{ width: "100%", height: s(1), background: c.line, marginTop: s(24) }} />
+
+      {/* Two-column body */}
+      <div
+        style={{
+          display: "flex",
+          flex: 1,
+          marginTop: s(28),
+          alignItems: "flex-start",
+          gap: s(40),
+        }}
+      >
+        {/* Left: headline + subline */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: `0 0 ${s(440)}px`,
+          }}
+        >
+          <div
+            style={{
+              fontFamily: "Instrument Serif",
+              fontStyle: "italic",
+              fontSize: s(180),
+              lineHeight: 0.9,
+              color: c.ember,
+              letterSpacing: "-0.03em",
+            }}
+          >
+            {data.headline}
+          </div>
+          <div
+            style={{
+              fontFamily: "Instrument Serif",
+              fontStyle: "italic",
+              fontSize: s(28),
+              color: c.text,
+              lineHeight: 1.25,
+              marginTop: s(18),
+            }}
+          >
+            {data.subline}
+          </div>
+        </div>
+
+        {/* Right: before/after blocks + caption */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            justifyContent: "space-between",
+            height: "100%",
+          }}
+        >
+          {/* BEFORE block */}
+          <ComparisonBlock
+            label={data.before.label}
+            stats={data.before.stats}
+            colors={c}
+            scale={scale}
+          />
+          {/* Separator */}
+          <div
+            style={{
+              width: "100%",
+              height: s(1),
+              background: c.line,
+              marginTop: s(18),
+              marginBottom: s(18),
+            }}
+          />
+          {/* AFTER block */}
+          <ComparisonBlock
+            label={data.after.label}
+            stats={data.after.stats}
+            colors={c}
+            scale={scale}
+            emphasize
+          />
+          {/* Caption */}
+          <div
+            style={{
+              fontFamily: "JetBrains Mono",
+              fontSize: s(13),
+              color: c.subtle,
+              marginTop: s(22),
+              letterSpacing: "0.05em",
+              lineHeight: 1.55,
+            }}
+          >
+            {data.caption}
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: s(32),
+          fontFamily: "JetBrains Mono",
+          fontSize: s(14),
+          color: c.subtle,
+          letterSpacing: "0.16em",
+        }}
+      >
+        <span>{`${data.footer.host}${data.footer.path}`}</span>
+        <span>BY SILK NODES</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * One half of a delta comparison: small mono label, then 1-2 stat
+ * lines. `emphasize` colors the first stat in the ember tone so the
+ * "AFTER" line carries extra visual weight (it's the answer the
+ * reader came for).
+ */
+function ComparisonBlock({
+  label,
+  stats,
+  colors,
+  scale,
+  emphasize = false,
+}: {
+  label: string;
+  stats: string[];
+  colors: ReturnType<typeof colorsFor>;
+  scale: number;
+  emphasize?: boolean;
+}) {
+  const s = (n: number) => Math.round(n * scale);
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div
+        style={{
+          fontFamily: "JetBrains Mono",
+          fontSize: s(12),
+          color: colors.subtle,
+          letterSpacing: "0.18em",
+          marginBottom: s(8),
+        }}
+      >
+        {label}
+      </div>
+      {stats.map((stat, i) => (
+        <div
+          key={i}
+          style={{
+            fontFamily: i === 0 ? "Inter Tight" : "JetBrains Mono",
+            fontSize: i === 0 ? s(34) : s(16),
+            fontWeight: i === 0 ? 500 : 400,
+            color: i === 0 && emphasize ? colors.ember : colors.text,
+            lineHeight: 1.15,
+            marginTop: i === 0 ? 0 : s(4),
+          }}
+        >
+          {stat}
+        </div>
+      ))}
+    </div>
+  );
+}
