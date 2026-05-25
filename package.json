@@ -15,6 +15,7 @@
     "indexer": "tsx --env-file=.env.local --env-file=.env.production.local scripts/indexer.ts",
     "indexer:backfill": "tsx --env-file=.env.local --env-file=.env.production.local scripts/indexer.ts --backfill",
     "analytics:refresh": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-analytics.ts",
+    "weekly-improvers": "tsx --env-file=.env.local --env-file=.env.production.local scripts/weekly-improvers.ts",
     "probe": "tsx --env-file=.env.local --env-file=.env.production.local scripts/probe-block.ts",
     "deploy": "./deploy/deploy.sh",
     "deploy:restart": "./deploy/deploy.sh --restart-only",
