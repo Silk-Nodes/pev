@@ -1,64 +1,30 @@
-"use client";
-
 /**
- * Analytics, loads Google Analytics ONLY after the user accepts via the
- * ConsentBanner. Until then, no third-party requests are made.
+ * Analytics, loads Google Analytics 4 for every visitor.
  *
- * Pairs with components/site/ConsentBanner.tsx, that component owns the
- * "ask the user" UI and writes the decision to localStorage. This one
- * just listens for the decision and conditionally renders the gtag
- * script tags.
+ * Previously consent-gated via ConsentBanner. We removed the banner
+ * because most visitors ignored it, which meant GA recorded almost
+ * nothing and we were flying blind on real usage. We keep the GA
+ * config minimal (anonymize_ip) and document everything collected on
+ * the /privacy page so visitors can see what's tracked and how to
+ * block it themselves (uBlock, browser DNT, etc.) if they prefer.
  *
- * Why conditional load instead of Google Consent Mode v2:
- *   Consent Mode v2 loads gtag immediately with `default: denied` and
- *   activates on consent. More compliant for pre-consent measurement
- *   but adds a third-party request even for users who never accept.
- *   Conditional load is simpler and stricter: zero data exfil pre-consent.
+ * Legal note: this is fine for US visitors. For EU/UK visitors, GDPR
+ * arguably requires explicit consent for non-essential cookies. We
+ * accept that tradeoff for now because pev is early and we need real
+ * signal on what's working. If we ever target EU dev community
+ * specifically or get a complaint, revisit.
  *
- * To revoke consent later: clear localStorage['pev:analytics-consent']
- * in DevTools, refresh, banner reappears. (We don't expose a UI for
- * this yet because nobody's asked for it.)
+ * To stop tracking entirely: remove this component from layout.tsx.
+ * To switch to a no-cookie alternative (Cloudflare Web Analytics,
+ * Plausible, Fathom), replace the script tags below with that
+ * provider's snippet.
  */
 
 import Script from "next/script";
-import { useEffect, useState } from "react";
-import {
-  CONSENT_KEY,
-  CONSENT_EVENT_ACCEPTED,
-  CONSENT_EVENT_DECLINED,
-  type ConsentDecision,
-} from "./consent-shared";
 
 const GA_MEASUREMENT_ID = "G-LJBQ3W2GNC";
 
 export default function Analytics() {
-  const [consent, setConsent] = useState<ConsentDecision>(null);
-
-  useEffect(() => {
-    // Read the stored decision on first mount (SSR-safe, only runs client-side).
-    try {
-      const stored = localStorage.getItem(CONSENT_KEY);
-      if (stored === "accepted" || stored === "declined") {
-        setConsent(stored);
-      }
-    } catch {
-      /* localStorage blocked (private browsing, etc.), treat as no decision */
-    }
-
-    // Live-react to the banner's decision events so the gtag tags load
-    // immediately on accept, no page refresh needed.
-    const onAccepted = () => setConsent("accepted");
-    const onDeclined = () => setConsent("declined");
-    window.addEventListener(CONSENT_EVENT_ACCEPTED, onAccepted);
-    window.addEventListener(CONSENT_EVENT_DECLINED, onDeclined);
-    return () => {
-      window.removeEventListener(CONSENT_EVENT_ACCEPTED, onAccepted);
-      window.removeEventListener(CONSENT_EVENT_DECLINED, onDeclined);
-    };
-  }, []);
-
-  if (consent !== "accepted") return null;
-
   return (
     <>
       <Script

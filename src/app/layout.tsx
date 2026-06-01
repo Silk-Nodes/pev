@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter_Tight, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Analytics from "@/components/site/Analytics";
-import ConsentBanner from "@/components/site/ConsentBanner";
 import { rootGraph } from "@/lib/seo/schema";
 
 /**
@@ -155,12 +154,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(rootGraph()) }}
         />
         {children}
-        {/* Privacy-first: <Analytics /> is a no-op until <ConsentBanner />
-            stores the user's accept decision in localStorage. So the gtag
-            script never loads on a fresh visit, and never loads at all
-            for users who decline. See components/site/Analytics.tsx for
-            why we chose conditional load over Google Consent Mode v2. */}
-        <ConsentBanner />
+        {/* Google Analytics 4, loads for every visitor with anonymize_ip
+            enabled. The /privacy page documents what's collected. We
+            previously gated this behind a ConsentBanner; removed it
+            because the gate killed our visibility into real usage and
+            most visitors ignored the prompt anyway. */}
         <Analytics />
       </body>
     </html>

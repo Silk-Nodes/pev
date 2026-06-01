@@ -13,8 +13,7 @@
  *
  * Positioning notes:
  *   • Fixed bottom-left so it's always reachable on long pages
- *   • z-index high enough to sit above ordinary content but below
- *     ConsentBanner (which is bottom-centered, no collision)
+ *   • z-index high enough to sit above ordinary content
  *   • Hidden on mobile to avoid covering the floating SearchBox area;
  *     on screens <600px wide the footer link to /feedback is enough
  */

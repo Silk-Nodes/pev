@@ -1,14 +1,14 @@
 /**
  * /privacy, the privacy policy for pev.
  *
- * Editorial format matching /docs. We have a ConsentBanner that asks
- * for permission before loading Google Analytics; this page is the
- * "what does that mean?" explanation users can click into from the
- * banner or footer if we ever link it from there.
+ * Editorial format matching /docs. We load Google Analytics 4 for
+ * every visitor (no consent banner) with anonymize_ip enabled. This
+ * page is the "what does that mean?" explanation.
  *
- * Honest framing: we collect almost nothing. Default state is no
- * tracking at all. Consent only flips on the GA pixel; consent-decline
- * means the gtag script never loads. No emails, no accounts, no PII.
+ * Honest framing: we collect anonymous aggregate pageview data via
+ * GA4 (URLs, country, browser, referrer). No emails, no accounts, no
+ * PII, no wallet addresses, no IP addresses. If you'd rather not
+ * share even that, use an ad blocker or browser DNT, both work.
  * On-chain data is public chain data, not personal data.
  *
  * Keep this page minimal and accurate. If we ever change tracking
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
     absolute: "Privacy policy: what pev collects and how it's stored",
   },
   description:
-    "pev collects almost nothing. No accounts, no emails, no tracking by default. If you accept the consent banner, Google Analytics tracks anonymous pageviews. That's it.",
+    "pev collects almost nothing. No accounts, no emails, no IP addresses, no wallet data. Google Analytics 4 tracks anonymous aggregate pageviews. That's it.",
   alternates: {
     canonical: "/privacy",
   },
@@ -103,28 +103,36 @@ export default function PrivacyPage() {
           }}
         >
           Short version: pev collects almost nothing. No accounts, no emails,
-          no tracking pixels by default. If you accept the consent banner,
-          Google Analytics 4 tracks anonymous pageviews. If you decline, even
-          that doesn&apos;t happen. The rest of this page is the long version.
+          no wallet addresses. We load Google Analytics 4 for every visitor
+          with anonymize_ip enabled, which gives us aggregate pageview counts
+          and not much else. If you&apos;d rather not share even that, an ad
+          blocker or browser DNT stops the script from loading. The rest of
+          this page is the long version.
         </p>
       </section>
 
-      <Section title="What pev tracks by default">
-        Nothing. No cookies, no analytics, no fingerprinting. The page loads,
-        you read it, you leave. We don&apos;t see it on our end.
-      </Section>
-
-      <Section title="What changes if you accept the consent banner">
-        Google Analytics 4 loads in your browser and records:
+      <Section title="What Google Analytics records">
+        Google Analytics 4 loads on every page and records:
         <ul style={listStyle}>
           <li>The URL of each page you visit on pev.silknodes.io</li>
           <li>How long you stay on each page</li>
           <li>Your browser type and operating system</li>
-          <li>Your country, sometimes city-level (never your IP address)</li>
+          <li>Your country, sometimes city-level (your IP is anonymized before storage)</li>
           <li>Whether you arrived via a link, a search, or directly</li>
         </ul>
         That&apos;s it. We don&apos;t link any of this to a real person; Google
         Analytics shows us aggregate dashboards, not individual sessions.
+      </Section>
+
+      <Section title="How to opt out">
+        Any of these stop GA from loading on pev:
+        <ul style={listStyle}>
+          <li>An ad blocker (uBlock Origin, Brave Shields, etc.)</li>
+          <li>Your browser&apos;s Do Not Track setting</li>
+          <li>The official Google Analytics Opt-out add-on</li>
+        </ul>
+        We don&apos;t check whether you&apos;ve blocked us. You don&apos;t need
+        to ask permission. The site works identically with or without GA.
       </Section>
 
       <Section title="What pev does NOT collect">
@@ -142,20 +150,6 @@ export default function PrivacyPage() {
           <li>Browser fingerprints or device identifiers</li>
           <li>Behavior on other websites</li>
         </ul>
-      </Section>
-
-      <Section title="Where your consent choice is stored">
-        Locally, in your browser&apos;s{" "}
-        <span className="pev-mono" style={{ color: themeA.text }}>
-          localStorage
-        </span>
-        , under a key called{" "}
-        <span className="pev-mono" style={{ color: themeA.text }}>
-          pev-consent
-        </span>
-        . It never leaves your machine. We don&apos;t have a server-side
-        record of your choice. Clearing your browser data resets it, and the
-        banner will ask again next visit.
       </Section>
 
       <Section title="On-chain data">
@@ -188,14 +182,12 @@ export default function PrivacyPage() {
       </Section>
 
       <Section title="If you want pev to forget you">
-        Clear the{" "}
-        <span className="pev-mono" style={{ color: themeA.text }}>
-          pev-consent
-        </span>{" "}
-        key from your browser&apos;s localStorage. The banner will reappear
-        on your next visit and you can decline. Google Analytics keeps its
-        own retention rules; we&apos;ve configured the property to delete
-        data after 14 months.
+        We have nothing to forget. pev itself has no record of you (no
+        cookies, no localStorage, no server-side log of who you are).
+        Google Analytics keeps aggregate session data on its end; we&apos;ve
+        configured the property to delete it after 14 months. If you want
+        even the aggregate counts gone, use an ad blocker so GA never loads
+        in the first place.
       </Section>
 
       <Section title="Changes to this policy">
@@ -242,7 +234,7 @@ export default function PrivacyPage() {
           letterSpacing: ".05em",
         }}
       >
-        last updated: 2026-05-13
+        last updated: 2026-06-01
       </p>
 
       <p style={{ marginTop: 16 }}>
