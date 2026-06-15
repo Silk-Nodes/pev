@@ -1889,5 +1889,210 @@ export async function writeAnalyticsCache(
   );
 }
 
+// ─── contract co-occurrence rollup (relationship graph) ─────────
+
+/**
+ * Result of one refresh run, for logging / ops visibility.
+ */
+export interface CooccurrenceRefreshResult {
+  /** Cursor position before this run. */
+  fromBlock: number;
+  /** Cursor position after this run (last block processed). */
+  toBlock: number;
+  /** How many block-chunks were processed this run. */
+  chunks: number;
+  /** Blocks covered this run (toBlock - fromBlock). */
+  blocksProcessed: number;
+  /** Whether we reached the chain head (false = more backlog remains). */
+  caughtUp: boolean;
+}
+
+/**
+ * Options for {@link refreshCooccurrence}.
+ */
+export interface CooccurrenceRefreshOptions {
+  /** Blocks per UPSERT chunk. Smaller = lighter peak load, more commits. */
+  chunkBlocks?: number;
+  /** Max chunks to process in one invocation (caps a huge backfill). */
+  maxChunks?: number;
+  /**
+   * On a cold cursor (last_block = 0), start this many blocks back from
+   * head instead of from genesis, so the first run builds just the
+   * recent useful window rather than all of history.
+   */
+  coldStartBackfillBlocks?: number;
+  /** work_mem for the pair-aggregation statement (default '256MB'). */
+  workMem?: string;
+  /**
+   * Skip txs touching more than this many distinct contracts. A tx
+   * touching k contracts generates k*(k-1)/2 pairs; without a cap, a
+   * multicall touching hundreds of contracts explodes the batch. We log
+   * how many txs were skipped so the dropped composability is visible.
+   */
+  maxContractsPerTx?: number;
+}
+
+/**
+ * Incrementally roll up contract co-occurrence into contract_pair_daily.
+ *
+ * Processes only blocks newer than the stored cursor, in chunks, with a
+ * server-side INSERT...SELECT...ON CONFLICT that never pulls pairs into
+ * JS. Each chunk runs in its own transaction with a raised work_mem so
+ * the pair aggregation stays in memory (no disk spill). The cursor and
+ * the rollup advance atomically per chunk, so an interrupted run resumes
+ * cleanly.
+ *
+ * Designed to be cheap enough to run on a frequent systemd timer in
+ * steady state (a few thousand new blocks per tick), and to backfill the
+ * recent window over several invocations on first run.
+ *
+ * See db/migrations/015_contract_pair_daily.sql and the spike scripts
+ * for the performance characteristics this is built around.
+ */
+export async function refreshCooccurrence(
+  opts: CooccurrenceRefreshOptions = {},
+): Promise<CooccurrenceRefreshResult> {
+  const chunkBlocks = opts.chunkBlocks ?? 20_000;
+  const maxChunks = opts.maxChunks ?? Number.MAX_SAFE_INTEGER;
+  const coldStartBackfillBlocks = opts.coldStartBackfillBlocks ?? 1_505_000; // ~7 days
+  const workMem = opts.workMem ?? "256MB";
+  const maxContractsPerTx = opts.maxContractsPerTx ?? 30;
+
+  // Current chain head as indexed.
+  const headRow = await queryOne<{ head: string }>(
+    `SELECT max(number)::text AS head FROM blocks`,
+  );
+  const head = headRow?.head ? parseInt(headRow.head, 10) : 0;
+  if (head === 0) {
+    return { fromBlock: 0, toBlock: 0, chunks: 0, blocksProcessed: 0, caughtUp: true };
+  }
+
+  // Cursor: where we left off. Cold start (0) jumps near head so the
+  // first run builds the recent window rather than all history.
+  const cursorRow = await queryOne<{ last_block: string }>(
+    `SELECT last_block::text FROM contract_pair_cursor WHERE id = 1`,
+  );
+  let cursor = cursorRow?.last_block ? parseInt(cursorRow.last_block, 10) : 0;
+  if (cursor === 0) {
+    cursor = Math.max(0, head - coldStartBackfillBlocks);
+  }
+
+  const fromBlock = cursor;
+  let chunks = 0;
+
+  while (cursor < head && chunks < maxChunks) {
+    const chunkEnd = Math.min(cursor + chunkBlocks, head);
+
+    // One transaction per chunk: raise work_mem locally, aggregate
+    // pairs for (cursor, chunkEnd], upsert-increment, advance cursor.
+    await withTransaction(async (client) => {
+      await client.query(`SET LOCAL work_mem = '${workMem}'`);
+
+      await client.query(
+        `WITH src AS (
+           SELECT
+             b.timestamp::date AS day,
+             ARRAY(SELECT DISTINCT u FROM unnest(te.contracts) AS u) AS cs
+           FROM tx_executions te
+           JOIN blocks b ON b.number = te.block_number
+           WHERE te.block_number > $1
+             AND te.block_number <= $2
+             AND te.contracts IS NOT NULL
+         ),
+         filtered AS (
+           SELECT day, cs
+           FROM src
+           WHERE array_length(cs, 1) BETWEEN 2 AND $3
+         ),
+         pairs AS (
+           SELECT
+             LEAST(x.a, y.b)    AS c1,
+             GREATEST(x.a, y.b) AS c2,
+             f.day              AS day
+           FROM filtered f
+           CROSS JOIN LATERAL unnest(f.cs) WITH ORDINALITY AS x(a, ia)
+           CROSS JOIN LATERAL unnest(f.cs) WITH ORDINALITY AS y(b, ib)
+           WHERE x.ia < y.ib
+         )
+         INSERT INTO contract_pair_daily (c1, c2, day, cooccur_count)
+         SELECT c1, c2, day, count(*)::bigint
+         FROM pairs
+         GROUP BY c1, c2, day
+         ON CONFLICT (c1, c2, day) DO UPDATE
+           SET cooccur_count = contract_pair_daily.cooccur_count + EXCLUDED.cooccur_count`,
+        [cursor, chunkEnd, maxContractsPerTx],
+      );
+
+      await client.query(
+        `UPDATE contract_pair_cursor
+            SET last_block = $1, updated_at = NOW()
+          WHERE id = 1`,
+        [chunkEnd],
+      );
+    });
+
+    cursor = chunkEnd;
+    chunks += 1;
+  }
+
+  return {
+    fromBlock,
+    toBlock: cursor,
+    chunks,
+    blocksProcessed: cursor - fromBlock,
+    caughtUp: cursor >= head,
+  };
+}
+
+/**
+ * One edge in the relationship graph: an unordered contract pair with
+ * its co-occurrence weight over the queried window.
+ */
+export interface CooccurrenceEdge {
+  c1: Hex;
+  c2: Hex;
+  cooccur: number;
+  conflicts: number;
+}
+
+/**
+ * Read the top co-occurring contract pairs over a rolling day window,
+ * straight from the pre-aggregated rollup. This is the fast read that
+ * backs the graph: a SUM over a small table, not a scan of tx_executions.
+ *
+ * @param windowDays how many days back to include
+ * @param limit      max edges to return (graph readability cap)
+ * @param minCooccur drop pairs seen fewer than this many times
+ */
+export async function getCooccurrenceEdges(
+  windowDays = 7,
+  limit = 500,
+  minCooccur = 10,
+): Promise<CooccurrenceEdge[]> {
+  const rows = await queryRows<{
+    c1: Buffer;
+    c2: Buffer;
+    cooccur: string;
+    conflicts: string;
+  }>(
+    `SELECT c1, c2,
+            sum(cooccur_count)::text  AS cooccur,
+            sum(conflict_count)::text AS conflicts
+       FROM contract_pair_daily
+      WHERE day >= (CURRENT_DATE - ($1::int - 1))
+      GROUP BY c1, c2
+     HAVING sum(cooccur_count) >= $2
+      ORDER BY sum(cooccur_count) DESC
+      LIMIT $3`,
+    [windowDays, minCooccur, limit],
+  );
+  return rows.map((r) => ({
+    c1: bufferToHex(r.c1),
+    c2: bufferToHex(r.c2),
+    cooccur: parseInt(r.cooccur, 10),
+    conflicts: parseInt(r.conflicts, 10),
+  }));
+}
+
 // Re-export the conflict kind so callers don't need two imports
 export type { ConflictKind, PEVStatus };
