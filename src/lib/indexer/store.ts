@@ -1992,7 +1992,15 @@ export async function refreshCooccurrence(
         `WITH src AS (
            SELECT
              b.timestamp::date AS day,
-             ARRAY(SELECT DISTINCT u FROM unnest(te.contracts) AS u) AS cs
+             -- Dedup AND drop NULL array elements: a NULL slot makes
+             -- LEAST/GREATEST skip it and return the same address for
+             -- both sides, producing a c1=c2 self-pair that violates the
+             -- table's c1<c2 check.
+             ARRAY(
+               SELECT DISTINCT u
+               FROM unnest(te.contracts) AS u
+               WHERE u IS NOT NULL
+             ) AS cs
            FROM tx_executions te
            JOIN blocks b ON b.number = te.block_number
            WHERE te.block_number > $1
@@ -2013,6 +2021,7 @@ export async function refreshCooccurrence(
            CROSS JOIN LATERAL unnest(f.cs) WITH ORDINALITY AS x(a, ia)
            CROSS JOIN LATERAL unnest(f.cs) WITH ORDINALITY AS y(b, ib)
            WHERE x.ia < y.ib
+             AND x.a <> y.b   -- defensive: never emit a self-pair
          )
          INSERT INTO contract_pair_daily (c1, c2, day, cooccur_count)
          SELECT c1, c2, day, count(*)::bigint
