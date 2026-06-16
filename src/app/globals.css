@@ -316,3 +316,11 @@ body {
   border-color: var(--pev-accent) !important;
   background: rgba(226, 140, 82, 0.06) !important;
 }
+
+/* Save-image button on the relationship graph. */
+.pev-graph-save {
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.pev-graph-save:hover {
+  border-color: var(--pev-accent) !important;
+}
