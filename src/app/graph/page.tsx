@@ -35,6 +35,14 @@ export const metadata: Metadata = {
       "Composability + contention graph of Monad mainnet contracts, from pev's execution traces.",
     type: "website",
     url: "/graph",
+    images: [{ url: "/og/graph", width: 1200, height: 630, alt: "Monad contract relationship graph" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "How Monad contracts connect",
+    description:
+      "Composability + contention graph of Monad mainnet contracts, from pev's execution traces.",
+    images: ["/og/graph"],
   },
 };
 

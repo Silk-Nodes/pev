@@ -1751,3 +1751,126 @@ function ComparisonBlock({
     </div>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════
+   GRAPH CARD, the /graph OG image. Headline + live stats on the left,
+   a pre-rendered chord (passed in as a base64 SVG data URI, since the
+   card cards are flexbox-only and the chord needs real SVG) on the
+   right. Always dark, the graph is a dark-canvas viz.
+   ════════════════════════════════════════════════════════════════ */
+
+export interface GraphCardData {
+  /** Eyebrow above the divider, e.g. "MAP · MONAD MAINNET · 7-DAY WINDOW" */
+  eyebrow: string;
+  /** Big serif headline */
+  headline: string;
+  /** One-line editorial subline */
+  subline: string;
+  /** Stat lines, e.g. ["50 contracts", "180,352 connections", "3 contend on storage"] */
+  stats: string[];
+  /** base64 data URI of the pre-rendered chord SVG */
+  chordDataUri: string;
+  footer: { host: string; path: string };
+}
+
+/**
+ * Render the /graph share card. Always uses the dark variant (the chord
+ * is light-on-dark). scale=1 → 1200x630; scale=4 → 4800x2520.
+ */
+export function renderGraphCard(data: GraphCardData, scale: number = 1): React.ReactElement {
+  const c = colorsFor("dark");
+  const s = (n: number) => Math.round(n * scale);
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: c.bg,
+        color: c.text,
+        fontFamily: "Inter Tight",
+        padding: `${s(48)}px ${s(56)}px`,
+      }}
+    >
+      {/* Top: lockup + eyebrow */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+        <div style={{ display: "flex", transform: `scale(${scale})`, transformOrigin: "left center" }}>
+          <Lockup colors={c} />
+        </div>
+        <div
+          style={{
+            display: "flex",
+            fontFamily: "JetBrains Mono",
+            fontSize: s(12),
+            color: c.subtle,
+            letterSpacing: "0.18em",
+          }}
+        >
+          <span>{data.eyebrow}</span>
+        </div>
+      </div>
+
+      <div style={{ width: "100%", height: s(1), background: c.line, marginTop: s(24) }} />
+
+      {/* Body: text left, chord right */}
+      <div style={{ display: "flex", flex: 1, marginTop: s(28), alignItems: "center", gap: s(36) }}>
+        <div style={{ display: "flex", flexDirection: "column", flex: `0 0 ${s(540)}px` }}>
+          <div
+            style={{
+              fontFamily: "Instrument Serif",
+              fontStyle: "italic",
+              fontSize: s(64),
+              lineHeight: 1.0,
+              color: c.text,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {data.headline}
+          </div>
+          <div
+            style={{
+              fontFamily: "Instrument Serif",
+              fontStyle: "italic",
+              fontSize: s(26),
+              color: c.muted,
+              lineHeight: 1.3,
+              marginTop: s(16),
+            }}
+          >
+            {data.subline}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", marginTop: s(28), gap: s(10) }}>
+            {data.stats.map((stat, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: s(10) }}>
+                <div style={{ display: "flex", width: s(7), height: s(7), borderRadius: s(7), background: c.ember }} />
+                <span style={{ fontFamily: "JetBrains Mono", fontSize: s(18), color: c.text }}>{stat}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "flex", flex: 1, alignItems: "center", justifyContent: "center" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={data.chordDataUri} width={s(420)} height={s(420)} alt="" />
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: s(28),
+          fontFamily: "JetBrains Mono",
+          fontSize: s(14),
+          color: c.subtle,
+          letterSpacing: "0.16em",
+        }}
+      >
+        <span>{`${data.footer.host}${data.footer.path}`}</span>
+        <span>BY SILK NODES</span>
+      </div>
+    </div>
+  );
+}
