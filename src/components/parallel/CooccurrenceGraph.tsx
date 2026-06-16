@@ -266,6 +266,17 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
         role="img"
         aria-label="Contract relationship graph: which Monad contracts co-occur in the same transactions"
       >
+        {/* Background: clicking empty space clears a pin (back to the
+            original all-contracts view). */}
+        <rect
+          x={0}
+          y={0}
+          width={SIZE}
+          height={SIZE}
+          fill="transparent"
+          onClick={() => setPinned(null)}
+        />
+
         {/* Edges */}
         <g>
           {edges.map((e, i) => {
@@ -316,7 +327,10 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
                 opacity={focus ? 1 : 0.18}
                 onMouseEnter={() => setHovered(n.address)}
                 onMouseLeave={() => setHovered(null)}
-                onClick={() => setPinned((cur) => (cur === n.address ? null : n.address))}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setPinned((cur) => (cur === n.address ? null : n.address));
+                }}
               >
                 <circle
                   cx={p.x}

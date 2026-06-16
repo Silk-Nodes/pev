@@ -231,6 +231,20 @@ export default function SiteHeader({
           }}
         >
           <Link
+            href="/graph"
+            className="pev-link"
+            style={{
+              fontFamily: themeA.mono,
+              fontSize: 11,
+              color: themeA.accent,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              letterSpacing: "0.05em",
+            }}
+          >
+            graph
+          </Link>
+          <Link
             href="/analytics"
             className="pev-link"
             style={{
