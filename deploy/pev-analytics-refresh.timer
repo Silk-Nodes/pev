@@ -1,15 +1,21 @@
 [Unit]
-Description=pev, fire pev-analytics-refresh.service every 5 minutes
+Description=pev, fire pev-analytics-refresh.service hourly
 
 [Timer]
 # Wait 60s after boot before the first run, gives postgres + the
 # indexer time to come up.
 OnBootSec=60s
 
-# Repeat every 5 minutes thereafter (timed from when the previous run
-# finished, not from the previous start; avoids overlap if a refresh
-# runs long).
-OnUnitInactiveSec=5min
+# Repeat hourly, timed from when the previous run FINISHED. The refresh
+# scans the full tx_executions (122M rows) + block_hot_slots (205M rows)
+# and takes ~5 min even with a warm cache, so the old 5-minute cadence
+# meant the box ran a heavy aggregation ~half the time and periodically
+# starved the live indexer of disk IO. The /analytics window is 7 days;
+# it does not need sub-hour freshness. Hourly = ~8% duty cycle instead
+# of ~50%. (Durable fix later: roll these aggregates up incrementally
+# like contract_pair_daily, so the refresh becomes cheap and frequent
+# refreshes stop mattering.)
+OnUnitInactiveSec=1h
 
 # Persistent state: if the VM was off for hours, run once at boot
 # instead of waiting for the next 5-minute boundary. The cache might
