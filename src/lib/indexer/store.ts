@@ -29,6 +29,10 @@ import type { BlockProbe, ConflictKind, Hex } from "@/lib/parallel-probe";
 import type { PEVData, PEVStatus } from "@/lib/probe-to-pev";
 import { shortHex } from "@/lib/probe-to-pev";
 import { publishBlockIndexed } from "@/lib/api/pubsub";
+// Used by getCooccurrenceGraph to bake human labels into the cached
+// payload. Background-job code path only (the refresh script), never a
+// page request. No circular dep: enrichment does not import store.
+import { resolveManyContracts } from "@/lib/enrichment";
 
 // ─── helpers ──────────────────────────────────────────────────────
 
@@ -2101,6 +2105,178 @@ export async function getCooccurrenceEdges(
     cooccur: parseInt(r.cooccur, 10),
     conflicts: parseInt(r.conflicts, 10),
   }));
+}
+
+// ─── contract relationship graph (built from the rollup) ────────
+
+/** A node in the relationship graph: one contract. */
+export interface CooccurrenceGraphNode {
+  address: Hex;
+  /** Resolved human label, or null if unknown. */
+  label: string | null;
+  /** Sum of co-occurrence across this node's visible edges (for sizing). */
+  weight: number;
+  /** Number of visible edges this node connects to (for sizing). */
+  degree: number;
+}
+
+/** An edge: an unordered contract pair and its weights over the window. */
+export interface CooccurrenceGraphEdge {
+  source: Hex; // c1 (canonical, c1 < c2)
+  target: Hex; // c2
+  cooccur: number;
+  conflicts: number;
+}
+
+/** The full graph payload that gets cached + rendered. */
+export interface CooccurrenceGraph {
+  nodes: CooccurrenceGraphNode[];
+  edges: CooccurrenceGraphEdge[];
+  windowDays: number;
+  /** Total distinct pairs in the window (before the top-N cut), for context. */
+  totalPairs: number;
+}
+
+/**
+ * Build the relationship graph from contract_pair_daily. Picks the top-N
+ * contracts by total co-occurrence over the window, then returns the
+ * edges that run BETWEEN those top contracts (a dense, readable subgraph
+ * of the most-connected contracts rather than a 10k-node hairball).
+ *
+ * Reads ONLY the pre-aggregated rollup (1GB-ish), never the source
+ * tables, so this is a light aggregation safe to run on a schedule. The
+ * result is meant to be cached via writeCooccurrenceCache; the page
+ * reads the cache, never calls this live.
+ *
+ * @param windowDays rolling window of day-buckets to include
+ * @param topNodes   keep the N highest-weight contracts
+ * @param minEdge    drop pairs co-occurring fewer than this many times
+ * @param maxEdges   safety cap on edges returned
+ */
+export async function getCooccurrenceGraph(
+  windowDays = 7,
+  topNodes = 50,
+  minEdge = 20,
+  maxEdges = 400,
+): Promise<CooccurrenceGraph> {
+  // One aggregation of the rollup: window the day-buckets, pick top-N
+  // nodes by weight, then return edges among them.
+  const sql = `
+    WITH win AS (
+      SELECT c1, c2,
+             sum(cooccur_count)::bigint  AS cooccur,
+             sum(conflict_count)::bigint AS conflicts
+      FROM contract_pair_daily
+      WHERE day >= (CURRENT_DATE - ($1::int - 1))
+      GROUP BY c1, c2
+      HAVING sum(cooccur_count) >= $3
+    ),
+    node_weights AS (
+      SELECT addr, sum(cooccur) AS weight
+      FROM (
+        SELECT c1 AS addr, cooccur FROM win
+        UNION ALL
+        SELECT c2 AS addr, cooccur FROM win
+      ) z
+      GROUP BY addr
+      ORDER BY weight DESC
+      LIMIT $2
+    )
+    SELECT w.c1, w.c2, w.cooccur::text AS cooccur, w.conflicts::text AS conflicts
+    FROM win w
+    WHERE w.c1 IN (SELECT addr FROM node_weights)
+      AND w.c2 IN (SELECT addr FROM node_weights)
+    ORDER BY w.cooccur DESC
+    LIMIT $4
+  `;
+  const { rows } = await query<{
+    c1: Buffer;
+    c2: Buffer;
+    cooccur: string;
+    conflicts: string;
+  }>(sql, [windowDays, topNodes, minEdge, maxEdges]);
+
+  // Total distinct pairs in the window, for context on the page.
+  const totalRow = await queryOne<{ n: string }>(
+    `SELECT count(*)::text AS n FROM (
+       SELECT 1 FROM contract_pair_daily
+       WHERE day >= (CURRENT_DATE - ($1::int - 1))
+       GROUP BY c1, c2
+     ) z`,
+    [windowDays],
+  );
+  const totalPairs = totalRow?.n ? parseInt(totalRow.n, 10) : rows.length;
+
+  // Derive nodes from the visible edges; accumulate degree + weight.
+  const nodeMap = new Map<string, { weight: number; degree: number }>();
+  const edges: CooccurrenceGraphEdge[] = rows.map((r) => {
+    const source = bufferToHex(r.c1);
+    const target = bufferToHex(r.c2);
+    const cooccur = parseInt(r.cooccur, 10);
+    const conflicts = parseInt(r.conflicts, 10);
+    for (const a of [source, target]) {
+      const n = nodeMap.get(a) ?? { weight: 0, degree: 0 };
+      n.weight += cooccur;
+      n.degree += 1;
+      nodeMap.set(a, n);
+    }
+    return { source, target, cooccur, conflicts };
+  });
+
+  // Resolve labels for every node in one batch (cache-first).
+  const addresses = [...nodeMap.keys()];
+  const labels =
+    addresses.length > 0
+      ? await resolveManyContracts(addresses)
+      : new Map<string, string | null>();
+
+  const nodes: CooccurrenceGraphNode[] = addresses.map((address) => ({
+    address: address as Hex,
+    label: labels.get(address) ?? null,
+    weight: nodeMap.get(address)!.weight,
+    degree: nodeMap.get(address)!.degree,
+  }));
+  // Heaviest nodes first (stable input for layout).
+  nodes.sort((a, b) => b.weight - a.weight);
+
+  return { nodes, edges, windowDays, totalPairs };
+}
+
+/**
+ * Read the precomputed relationship-graph payload. Hot path for the
+ * /graph page: a single PK lookup. Null if never built yet.
+ */
+export async function getCachedCooccurrenceGraph(): Promise<{
+  data: CooccurrenceGraph;
+  refreshedAt: Date;
+  refreshMs: number | null;
+} | null> {
+  const row = await queryOne<{
+    payload: CooccurrenceGraph;
+    refreshed_at: Date;
+    refresh_ms: number | null;
+  }>(
+    `SELECT payload, refreshed_at, refresh_ms FROM cooccurrence_cache WHERE id = 1`,
+  );
+  if (!row) return null;
+  return { data: row.payload, refreshedAt: row.refreshed_at, refreshMs: row.refresh_ms };
+}
+
+/**
+ * Upsert the relationship-graph cache. Called by
+ * scripts/refresh-cooccurrence-graph.ts on its timer.
+ */
+export async function writeCooccurrenceCache(
+  payload: CooccurrenceGraph,
+  refreshMs: number,
+): Promise<void> {
+  await query(
+    `INSERT INTO cooccurrence_cache (id, payload, refreshed_at, refresh_ms)
+       VALUES (1, $1::jsonb, NOW(), $2)
+     ON CONFLICT (id) DO UPDATE
+       SET payload = EXCLUDED.payload, refreshed_at = NOW(), refresh_ms = EXCLUDED.refresh_ms`,
+    [JSON.stringify(payload), refreshMs],
+  );
 }
 
 // Re-export the conflict kind so callers don't need two imports

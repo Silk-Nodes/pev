@@ -16,6 +16,7 @@
     "indexer:backfill": "tsx --env-file=.env.local --env-file=.env.production.local scripts/indexer.ts --backfill",
     "analytics:refresh": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-analytics.ts",
     "cooccurrence:refresh": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-cooccurrence.ts",
+    "cooccurrence:graph": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-cooccurrence-graph.ts",
     "weekly-improvers": "tsx --env-file=.env.local --env-file=.env.production.local scripts/weekly-improvers.ts",
     "contract-daily": "tsx --env-file=.env.local --env-file=.env.production.local scripts/contract-daily.ts",
     "probe": "tsx --env-file=.env.local --env-file=.env.production.local scripts/probe-block.ts",
