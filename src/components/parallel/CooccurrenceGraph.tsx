@@ -12,11 +12,13 @@
  *   - node color     = ember if labelled, grey if unknown
  *
  * Interaction:
- *   - hover a node  → highlight it + its neighbours + the edges between
- *                     them, fade the rest, surface a readout
- *   - click a node  → navigate to that contract's page
- *   - "save image"  → rasterise the SVG to a branded PNG (title + the
- *                     pev.silknodes.io/graph URL baked in) for sharing
+ *   - hover a node  → transient highlight of it + its neighbours
+ *   - click a node  → PIN that highlight (stays after the mouse leaves),
+ *                     so you can lock a contract's connections and then
+ *                     screenshot them. Click again (or the node) to unpin.
+ *   - "open contract ↗" in the readout navigates to the contract page.
+ *   - "save image"  → branded PNG (title + pev.silknodes.io/graph baked
+ *                     in). Captures the current view, including a pin.
  *
  * Circular layout is deterministic, so the SSR render matches hydration.
  */
@@ -34,23 +36,31 @@ function shortAddr(hex: string): string {
 }
 function nodeDisplay(n: CooccurrenceGraphNode): string {
   const s = n.label ?? shortAddr(n.address);
-  return s.length > 24 ? s.slice(0, 23) + "…" : s;
+  return s.length > 18 ? s.slice(0, 17) + "…" : s;
+}
+function fullName(n: CooccurrenceGraphNode): string {
+  return n.label ?? shortAddr(n.address);
 }
 
-// viewBox is square; the circle sits well inside it so radial labels have
-// room before the edge (avoids the clipping we had at 900px).
+// Square viewBox; the circle fills most of it, with just enough margin
+// for the (truncated) radial labels to sit outside the ring un-clipped.
 const SIZE = 1000;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
-const RADIUS = SIZE * 0.30;
-const LABEL_RADIUS = RADIUS + 16;
+const RADIUS = SIZE * 0.35;
+const LABEL_RADIUS = RADIUS + 14;
 
 export function CooccurrenceGraph({ data }: { data: GraphData }) {
   const router = useRouter();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [pinned, setPinned] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const { nodes, edges } = data;
+
+  // The node whose connections are currently highlighted: a pin wins over
+  // a transient hover.
+  const active = pinned ?? hovered;
 
   const layout = useMemo(() => {
     const pos = new Map<string, { x: number; y: number; angle: number }>();
@@ -73,7 +83,6 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
     };
   }, [nodes, edges]);
 
-  // Rasterise the current SVG to a branded, shareable PNG.
   async function saveImage() {
     const svg = svgRef.current;
     if (!svg) return;
@@ -83,8 +92,6 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
       clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
       clone.setAttribute("width", String(SIZE));
       clone.setAttribute("height", String(SIZE));
-      // Override the on-page responsive style (min(74vh,...)) so the
-      // rasteriser uses the fixed 1000x1000 size, not a viewport unit.
       clone.style.width = `${SIZE}px`;
       clone.style.height = `${SIZE}px`;
       clone.style.maxWidth = "none";
@@ -109,16 +116,19 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
       const ctx = canvas.getContext("2d")!;
       ctx.scale(scale, scale);
 
-      // Background
       ctx.fillStyle = "#0e0d0b";
       ctx.fillRect(0, 0, W, H);
 
-      // Header: title + subtitle
       ctx.textBaseline = "alphabetic";
       ctx.textAlign = "left";
       ctx.fillStyle = palette.bone;
       ctx.font = "italic 34px Georgia, 'Times New Roman', serif";
-      ctx.fillText("Which contracts move together.", 40, 56);
+      const pinnedNode = pinned ? nodes.find((n) => n.address === pinned) : null;
+      ctx.fillText(
+        pinnedNode ? `${fullName(pinnedNode)} — connections` : "Which contracts move together.",
+        40,
+        56,
+      );
       ctx.fillStyle = themeA.muted;
       ctx.font = "15px ui-monospace, Menlo, monospace";
       ctx.fillText(
@@ -127,10 +137,8 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
         80,
       );
 
-      // Graph
       ctx.drawImage(img, 0, headerH, SIZE, SIZE);
 
-      // Footer: pev wordmark (left) + URL (right)
       const fy = headerH + SIZE + 38;
       ctx.textAlign = "left";
       ctx.fillStyle = palette.ember;
@@ -166,36 +174,53 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
     return <div style={{ color: themeA.muted, fontSize: 14, padding: 24 }}>No relationship data yet.</div>;
   }
 
-  const neighbours = hovered ? layout.adj.get(hovered) ?? new Set<string>() : null;
-  const isFocusNode = (addr: string) => !hovered || addr === hovered || (neighbours?.has(addr) ?? false);
-  const isFocusEdge = (s: string, t: string) => !hovered || s === hovered || t === hovered;
-  const hoveredNode = hovered ? nodes.find((n) => n.address === hovered) ?? null : null;
+  const neighbours = active ? layout.adj.get(active) ?? new Set<string>() : null;
+  const isFocusNode = (addr: string) => !active || addr === active || (neighbours?.has(addr) ?? false);
+  const isFocusEdge = (s: string, t: string) => !active || s === active || t === active;
+  const activeNode = active ? nodes.find((n) => n.address === active) ?? null : null;
 
   return (
     <div style={{ position: "relative" }}>
-      {/* Top bar: hover readout (left) + save button (right) */}
+      {/* Top bar: readout (left) + save button (right) */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 12,
           marginBottom: 8,
           fontFamily: themeA.mono,
           fontSize: 12,
           color: themeA.muted,
-          minHeight: 26,
+          minHeight: 28,
+          flexWrap: "wrap",
         }}
       >
-        <span style={{ pointerEvents: "none" }}>
-          {hoveredNode ? (
-            <span>
-              <span style={{ color: palette.ember }}>{nodeDisplay(hoveredNode)}</span>
+        <span>
+          {activeNode ? (
+            <>
+              <span style={{ color: palette.ember }}>{fullName(activeNode)}</span>
               {" · "}
-              {hoveredNode.degree} connection{hoveredNode.degree === 1 ? "" : "s"}
-              {" · click to open"}
-            </span>
+              {activeNode.degree} connection{activeNode.degree === 1 ? "" : "s"}
+              {" · "}
+              <a
+                href={`/contract/${active}`}
+                className="pev-link"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  router.push(`/contract/${active}`);
+                }}
+                style={{ color: themeA.text }}
+              >
+                open contract ↗
+              </a>
+              {" · "}
+              <span style={{ color: themeA.subtle }}>
+                {pinned ? "pinned — save image captures this" : "click to pin"}
+              </span>
+            </>
           ) : (
-            <span>hover a contract to trace its connections</span>
+            <span>hover a contract to trace its connections · click to pin one</span>
           )}
         </span>
         <button
@@ -218,7 +243,6 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             whiteSpace: "nowrap",
           }}
         >
-          {/* camera glyph */}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
             <circle cx="12" cy="13" r="4" />
@@ -232,7 +256,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
         viewBox={`0 0 ${SIZE} ${SIZE}`}
         style={{
           width: "auto",
-          height: "min(74vh, 720px)",
+          height: "min(84vh, 880px)",
           maxWidth: "100%",
           display: "block",
           margin: "0 auto",
@@ -256,7 +280,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             const contended = e.conflicts > 0;
             const focus = isFocusEdge(e.source, e.target);
             let opacity = contended ? 0.5 : 0.14;
-            if (hovered) opacity = focus ? (contended ? 0.85 : 0.5) : 0.04;
+            if (active) opacity = focus ? (contended ? 0.85 : 0.5) : 0.04;
             return (
               <path
                 key={i}
@@ -264,7 +288,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
                 fill="none"
                 stroke={contended ? palette.ember : palette.bone}
                 strokeOpacity={opacity}
-                strokeWidth={layout.edgeWidth(e.cooccur) * (hovered && focus ? 1.5 : 1)}
+                strokeWidth={layout.edgeWidth(e.cooccur) * (active && focus ? 1.5 : 1)}
                 strokeLinecap="round"
               />
             );
@@ -281,7 +305,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             const ly = CY + LABEL_RADIUS * Math.sin(p.angle);
             const named = n.label != null;
             const focus = isFocusNode(n.address);
-            const isHovered = n.address === hovered;
+            const isActive = n.address === active;
             const angleDeg = (p.angle * 180) / Math.PI;
             const labelRot = onRight ? angleDeg : angleDeg + 180;
             const labelAnchor = onRight ? "start" : "end";
@@ -292,25 +316,25 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
                 opacity={focus ? 1 : 0.18}
                 onMouseEnter={() => setHovered(n.address)}
                 onMouseLeave={() => setHovered(null)}
-                onClick={() => router.push(`/contract/${n.address}`)}
+                onClick={() => setPinned((cur) => (cur === n.address ? null : n.address))}
               >
                 <circle
                   cx={p.x}
                   cy={p.y}
-                  r={isHovered ? r * 1.4 : r}
+                  r={isActive ? r * 1.4 : r}
                   fill={named ? palette.ember : palette.stone}
                   fillOpacity={named ? 0.95 : 0.6}
-                  stroke={isHovered ? palette.bone : themeA.graphBg}
-                  strokeWidth={isHovered ? 2 : 1.5}
+                  stroke={isActive ? palette.bone : themeA.graphBg}
+                  strokeWidth={isActive ? 2 : 1.5}
                 />
-                {(named || isHovered) && (
+                {(named || isActive) && (
                   <text
                     x={lx}
                     y={ly}
-                    fontSize={isHovered ? 12 : 10}
+                    fontSize={isActive ? 12 : 10}
                     fontFamily={named ? "var(--font-sans, sans-serif)" : "var(--font-mono, monospace)"}
-                    fill={isHovered ? palette.bone : named ? themeA.text : themeA.muted}
-                    fontWeight={isHovered ? 600 : 400}
+                    fill={isActive ? palette.bone : named ? themeA.text : themeA.muted}
+                    fontWeight={isActive ? 600 : 400}
                     textAnchor={labelAnchor}
                     dominantBaseline="middle"
                     transform={`rotate(${labelRot.toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})`}
