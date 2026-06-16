@@ -1,0 +1,33 @@
+[Unit]
+Description=pev, incremental contract co-occurrence rollup (feeds contract_pair_daily)
+Documentation=https://github.com/Silk-Nodes/pev
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+# One-shot: processes only the blocks newer than its cursor, in small
+# chunks, then exits. Steady-state tick is a few thousand new blocks
+# (~seconds); the --max-chunks cap bounds a catch-up if it was off for
+# a while so one fire can't run away.
+Type=oneshot
+
+User=deploy
+Group=deploy
+WorkingDirectory=/home/deploy/pev
+
+ExecStart=/home/deploy/pev/deploy/run.sh cooccurrence:refresh -- --max-chunks=10
+
+# Each 20k-block chunk takes ~40s; 10 chunks worst case. Generous cap so
+# a backlog catch-up isn't killed mid-chunk (the cursor commits per
+# chunk, so a kill is safe to resume anyway).
+TimeoutStartSec=600s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pev-cooccurrence-refresh
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/deploy/pev

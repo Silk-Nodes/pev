@@ -1,0 +1,15 @@
+[Unit]
+Description=pev, rebuild the relationship-graph cache every 2 hours (offset from analytics)
+
+[Timer]
+# Fixed wall-clock schedule (not inactivity-relative) so it lands at a
+# predictable minute that does NOT collide with the analytics refresh.
+# Analytics runs hourly on its own drift; this runs every 2 hours at :40,
+# keeping the two heavy-ish jobs apart. The graph changes slowly, so
+# 2-hourly freshness is plenty.
+OnCalendar=*-*-* 00/2:40:00
+Persistent=true
+Unit=pev-cooccurrence-graph-refresh.service
+
+[Install]
+WantedBy=timers.target

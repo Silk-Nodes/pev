@@ -1,0 +1,14 @@
+[Unit]
+Description=pev, fire the co-occurrence rollup every 20 minutes
+
+[Timer]
+OnBootSec=120s
+# Every 20 min, timed from when the previous run finished. Steady-state
+# work is tiny (a few thousand new blocks), so this keeps contract_pair_daily
+# current without meaningful load.
+OnUnitInactiveSec=20min
+Persistent=true
+Unit=pev-cooccurrence-refresh.service
+
+[Install]
+WantedBy=timers.target

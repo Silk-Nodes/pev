@@ -2159,10 +2159,14 @@ export async function getCooccurrenceGraph(
   minEdge = 20,
   maxEdges = 400,
 ): Promise<CooccurrenceGraph> {
-  // One aggregation of the rollup: window the day-buckets, pick top-N
-  // nodes by weight, then return edges among them.
+  // One pass over the rollup. `win` is MATERIALIZED so the expensive
+  // window aggregation runs exactly ONCE and is reused by node_weights,
+  // the total-pairs count, and the final edge filter (otherwise Postgres
+  // may re-run the GROUP BY for each reference, which doubled the build
+  // time). totalPairs (count of all in-window pairs ≥ minEdge) is folded
+  // into the same query rather than a second aggregation.
   const sql = `
-    WITH win AS (
+    WITH win AS MATERIALIZED (
       SELECT c1, c2,
              sum(cooccur_count)::bigint  AS cooccur,
              sum(conflict_count)::bigint AS conflicts
@@ -2182,7 +2186,11 @@ export async function getCooccurrenceGraph(
       ORDER BY weight DESC
       LIMIT $2
     )
-    SELECT w.c1, w.c2, w.cooccur::text AS cooccur, w.conflicts::text AS conflicts
+    SELECT
+      w.c1, w.c2,
+      w.cooccur::text   AS cooccur,
+      w.conflicts::text AS conflicts,
+      (SELECT count(*) FROM win)::text AS total_pairs
     FROM win w
     WHERE w.c1 IN (SELECT addr FROM node_weights)
       AND w.c2 IN (SELECT addr FROM node_weights)
@@ -2194,18 +2202,10 @@ export async function getCooccurrenceGraph(
     c2: Buffer;
     cooccur: string;
     conflicts: string;
+    total_pairs: string;
   }>(sql, [windowDays, topNodes, minEdge, maxEdges]);
 
-  // Total distinct pairs in the window, for context on the page.
-  const totalRow = await queryOne<{ n: string }>(
-    `SELECT count(*)::text AS n FROM (
-       SELECT 1 FROM contract_pair_daily
-       WHERE day >= (CURRENT_DATE - ($1::int - 1))
-       GROUP BY c1, c2
-     ) z`,
-    [windowDays],
-  );
-  const totalPairs = totalRow?.n ? parseInt(totalRow.n, 10) : rows.length;
+  const totalPairs = rows[0]?.total_pairs ? parseInt(rows[0].total_pairs, 10) : rows.length;
 
   // Derive nodes from the visible edges; accumulate degree + weight.
   const nodeMap = new Map<string, { weight: number; degree: number }>();
