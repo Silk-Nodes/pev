@@ -306,3 +306,13 @@ body {
 .pev-row-killer:hover {
   background: rgba(226, 140, 82, 0.06) !important;
 }
+
+/* Relationship-graph CTA card on the homepage. Border warms + a faint
+   tint on hover so the whole card reads as one click target. */
+.pev-graph-cta {
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.pev-graph-cta:hover {
+  border-color: var(--pev-accent) !important;
+  background: rgba(226, 140, 82, 0.06) !important;
+}

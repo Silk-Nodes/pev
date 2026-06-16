@@ -130,6 +130,14 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             const named = n.label != null;
             const focus = isFocusNode(n.address);
             const isHovered = n.address === hovered;
+            // Radial "spoke" labels: rotate each label to read outward
+            // along its radius. This stops the labels from stacking on top
+            // of each other where nodes cluster at the top/bottom arcs.
+            // Left-half labels get +180° and end-anchoring so they stay
+            // right-way-up instead of upside down.
+            const angleDeg = (p.angle * 180) / Math.PI;
+            const labelRot = onRight ? angleDeg : angleDeg + 180;
+            const labelAnchor = onRight ? "start" : "end";
             return (
               <g
                 key={n.address}
@@ -148,17 +156,22 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
                   stroke={isHovered ? palette.bone : themeA.graphBg}
                   strokeWidth={isHovered ? 2 : 1.5}
                 />
-                {/* Show labels for named nodes always; for unnamed only when focused by a hover */}
-                {(named || (hovered && focus)) && (
+                {/* Label only named nodes (always) and the one being
+                    hovered. We deliberately do NOT label every neighbour
+                    on hover, that piled labels on top of each other; the
+                    readout below the graph names the focused contract
+                    instead. */}
+                {(named || isHovered) && (
                   <text
                     x={lx}
                     y={ly}
-                    fontSize={isHovered ? 13 : 11}
+                    fontSize={isHovered ? 12 : 10}
                     fontFamily={named ? "var(--font-sans, sans-serif)" : "var(--font-mono, monospace)"}
                     fill={isHovered ? palette.bone : named ? themeA.text : themeA.muted}
                     fontWeight={isHovered ? 600 : 400}
-                    textAnchor={onRight ? "start" : "end"}
+                    textAnchor={labelAnchor}
                     dominantBaseline="middle"
+                    transform={`rotate(${labelRot.toFixed(1)} ${lx.toFixed(1)} ${ly.toFixed(1)})`}
                   >
                     {nodeDisplay(n)}
                   </text>

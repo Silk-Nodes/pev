@@ -525,6 +525,55 @@ export default async function PEVLanding({
           </div>
         </section>
 
+        {/* ─── Relationship graph CTA ──────────────────────────── */}
+        <section style={{ marginBottom: 56 }}>
+          <Link
+            href="/graph"
+            className="pev-graph-cta"
+            style={{
+              display: "block",
+              padding: "26px 28px",
+              border: `1px solid ${themeA.border}`,
+              borderRadius: themeA.radius,
+              background: palette.surface02,
+              textDecoration: "none",
+            }}
+          >
+            <div
+              className="pev-eyebrow"
+              style={{ marginBottom: 12, color: themeA.accent }}
+            >
+              New · Relationship graph
+            </div>
+            <div
+              className="pev-display-italic"
+              style={{
+                fontSize: "clamp(22px, 2.6vw, 28px)",
+                color: themeA.text,
+                lineHeight: 1.3,
+                marginBottom: 12,
+                maxWidth: "30ch",
+              }}
+            >
+              See which contracts move together. →
+            </div>
+            <p
+              style={{
+                fontFamily: themeA.sans,
+                fontSize: 15,
+                color: themeA.muted,
+                lineHeight: 1.6,
+                maxWidth: "62ch",
+                margin: 0,
+              }}
+            >
+              An interactive map of how Monad&apos;s protocols compose at
+              runtime: which contracts share transactions, and which of them
+              collide on storage. Hover any contract to trace its connections.
+            </p>
+          </Link>
+        </section>
+
         {/* ─── Honesty ─────────────────────────────────────────── */}
         <section
           style={{
