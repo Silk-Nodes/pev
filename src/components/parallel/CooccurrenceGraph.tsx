@@ -23,7 +23,7 @@
  *   - "save image" → branded PNG (pev.silknodes.io/graph baked in)
  */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { themeA, palette } from "@/components/parallel/theme";
 import type {
@@ -51,12 +51,19 @@ const CY = SIZE / 2;
 const RADIUS = SIZE * 0.34;
 const LABEL_RADIUS = RADIUS + 14;
 
+type Pt = { x: number; y: number };
+
 export function CooccurrenceGraph({ data }: { data: GraphData }) {
   const router = useRouter();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  // Real-time light-up: pings fired when a live block touches a node, and
+  // the SSE connection status.
+  const [pings, setPings] = useState<{ id: number; x: number; y: number }[]>([]);
+  const [live, setLive] = useState<"connecting" | "live" | "offline">("connecting");
+  const pingId = useRef(0);
   const { nodes, edges } = data;
   const active = pinned ?? hovered;
 
@@ -82,6 +89,54 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
       nodeRadius: (w: number) => 3 + 10 * Math.sqrt(w / maxWeight),
     };
   }, [nodes, edges]);
+
+  // Real-time light-up: subscribe to the live block feed and ping any of
+  // our nodes that a freshly-indexed block touched. Auto-reconnects.
+  useEffect(() => {
+    const posByLower = new Map<string, Pt>();
+    for (const n of nodes) {
+      const p = layout.pos.get(n.address);
+      if (p) posByLower.set(n.address.toLowerCase(), { x: p.x, y: p.y });
+    }
+    let es: EventSource | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
+    let closed = false;
+
+    const connect = () => {
+      es = new EventSource("/api/v1/graph-live");
+      es.onopen = () => setLive("live");
+      es.addEventListener("hello", () => setLive("live"));
+      es.addEventListener("block", (ev) => {
+        try {
+          const { contracts } = JSON.parse((ev as MessageEvent).data) as { contracts: string[] };
+          const fresh: { id: number; x: number; y: number }[] = [];
+          for (const c of contracts) {
+            const p = posByLower.get(c.toLowerCase());
+            if (p) fresh.push({ id: pingId.current++, x: p.x, y: p.y });
+            if (fresh.length >= 16) break; // cap pings per block
+          }
+          if (fresh.length) {
+            setPings((prev) => [...prev, ...fresh]);
+            const ids = new Set(fresh.map((f) => f.id));
+            setTimeout(() => setPings((prev) => prev.filter((p) => !ids.has(p.id))), 1200);
+          }
+        } catch {
+          /* ignore malformed event */
+        }
+      });
+      es.onerror = () => {
+        setLive("offline");
+        es?.close();
+        if (!closed) retry = setTimeout(connect, 4000);
+      };
+    };
+    connect();
+    return () => {
+      closed = true;
+      es?.close();
+      if (retry) clearTimeout(retry);
+    };
+  }, [nodes, layout]);
 
   // Detail for the pinned contract: its connections, ranked.
   const detail = useMemo(() => {
@@ -212,6 +267,18 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             <span>hover a contract to trace its connections · click to pin one</span>
           )}
         </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 14 }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }} title={live === "live" ? "streaming live blocks" : live === "offline" ? "reconnecting" : "connecting"}>
+            <span
+              className={live === "live" ? "pev-live-dot" : undefined}
+              style={{
+                width: 7, height: 7, borderRadius: 7,
+                background: live === "live" ? palette.sage : live === "offline" ? palette.terracotta : palette.amber,
+                display: "inline-block",
+              }}
+            />
+            <span style={{ color: themeA.subtle }}>{live === "live" ? "live" : live === "offline" ? "offline" : "…"}</span>
+          </span>
         <button
           type="button" onClick={saveImage} disabled={saveState === "saving"}
           className="pev-graph-save"
@@ -229,6 +296,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
           </svg>
           {saveState === "saved" ? "saved to downloads" : saveState === "saving" ? "rendering…" : "save image"}
         </button>
+        </span>
       </div>
 
       <svg
@@ -270,6 +338,16 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
               />
             );
           })}
+        </g>
+
+        {/* Live pings: expanding ember rings when a block touches a node */}
+        <g>
+          {pings.map((p) => (
+            <circle key={p.id} cx={p.x} cy={p.y} r={4} fill="none" stroke={palette.ember} strokeWidth={2.5} opacity={0.7}>
+              <animate attributeName="r" from="4" to="34" dur="1.1s" fill="freeze" />
+              <animate attributeName="opacity" from="0.7" to="0" dur="1.1s" fill="freeze" />
+            </circle>
+          ))}
         </g>
 
         {/* Nodes + radial labels */}

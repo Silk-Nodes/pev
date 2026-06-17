@@ -324,3 +324,13 @@ body {
 .pev-graph-save:hover {
   border-color: var(--pev-accent) !important;
 }
+
+/* Live-connection dot on the relationship graph: a soft breathing pulse
+   while the SSE stream is connected. */
+@keyframes pev-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.pev-live-dot {
+  animation: pev-live-pulse 2s ease-in-out infinite;
+}
