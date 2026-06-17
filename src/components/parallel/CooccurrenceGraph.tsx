@@ -358,8 +358,11 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             // strongest links read first and weak ones recede (kills the
             // muddy "one giant ball" look). Contended edges keep a floor.
             const rel = e.cooccur / layout.maxCooccur;
-            let opacity = contended ? 0.4 + 0.45 * rel : 0.05 + 0.3 * rel;
-            if (active) opacity = focus ? (contended ? 0.9 : 0.55) : 0.03;
+            // Floor kept high enough that even the weakest link stays
+            // visible (a node should never look isolated, its nodes are
+            // derived from edges), while strong links still read first.
+            let opacity = contended ? 0.45 + 0.4 * rel : 0.16 + 0.34 * rel;
+            if (active) opacity = focus ? (contended ? 0.9 : 0.6) : 0.04;
             return (
               <path
                 key={i}

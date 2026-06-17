@@ -191,10 +191,9 @@ contracts:
     source: manual
     notes: "conflicts=73,580 txs=452,306"
   - address: 0xa6afd386135b7d41a6c40c525abc4a1019b0d132
-    # TODO: research this address
-    name: ""
+    name: "Kuru Exchange: Market-WETH/USDC"
     source: manual
-    notes: "conflicts=63,030 txs=498,524"
+    notes: "Kuru WETH/USDC market. conflicts=63,030 txs=498,524. Provided by maintainer."
   - address: 0x20e03076b84f21e8a08db2f3f36bb558dc4ed323
     # TODO: research this address
     name: ""
@@ -659,3 +658,15 @@ contracts:
     name: "Capricorn: WMON/SHARKIE Pool (1%)"
     source: manual
     notes: "Capricorn CL pool. token0=WMON (0x3bd359c1…), token1=SHARKIE (0x6a13bfcb…), fee=10000 bps (1%). Created by Capricorn CLFactory."
+  - address: 0xe4bfe4071d363e1d4274fb8f79cb510b75913020
+    name: "Monad: MultiFeedAdapterWithoutRoundsV1"
+    source: manual
+    notes: "On-chain name()='MonadMultiFeedAdapterWithoutRoundsV1'. Oracle feed adapter. Provided by maintainer."
+  - address: 0x4c0ba1ba8404076e2b09c7a5d014ec999c3a27e2
+    name: "OrderBook"
+    source: manual
+    notes: "On-chain name()='OrderBook'. Provided by maintainer."
+  - address: 0x856a4019228c265dee336df705277607c4a18e1b
+    name: "ShMonad"
+    source: manual
+    notes: "ShMonad-deployed contract. Provided by maintainer."
