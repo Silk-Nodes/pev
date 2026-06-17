@@ -81,10 +81,39 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
       (adj.get(e.target) ?? adj.set(e.target, new Set()).get(e.target)!).add(e.source);
     }
     const nodeByAddr = new Map(nodes.map((n) => [n.address, n]));
+
+    // Continuous-flow particles: the strongest edges each carry a dot that
+    // perpetually travels the chord, so the network is always in motion
+    // (the gmonads "energy coursing through the network" feel). Staggered,
+    // deterministic timing so SSR and client agree and they don't pulse in
+    // lockstep. Heavier / contended edges flow a touch faster + brighter.
+    const flowEdges = [...edges]
+      .sort((a, b) => b.cooccur - a.cooccur)
+      .slice(0, 72)
+      .map((e, i) => {
+        const a = pos.get(e.source)!;
+        const b = pos.get(e.target)!;
+        const mx = (a.x + b.x) / 2;
+        const my = (a.y + b.y) / 2;
+        const qx = mx + (CX - mx) * 0.45;
+        const qy = my + (CY - my) * 0.45;
+        const d = `M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q${qx.toFixed(1)} ${qy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
+        const contended = e.conflicts > 0;
+        return {
+          d,
+          contended,
+          dur: (contended ? 2.4 : 3.0) + (i % 6) * 0.3,
+          begin: `-${((i * 0.19) % 3).toFixed(2)}s`,
+          source: e.source,
+          target: e.target,
+        };
+      });
+
     return {
       pos,
       adj,
       nodeByAddr,
+      flowEdges,
       edgeWidth: (c: number) => 0.4 + 4.6 * Math.sqrt(c / maxCooccur),
       nodeRadius: (w: number) => 3 + 10 * Math.sqrt(w / maxWeight),
     };
@@ -336,6 +365,25 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
                 strokeWidth={layout.edgeWidth(e.cooccur) * (active && focus ? 1.5 : 1)}
                 strokeLinecap="round"
               />
+            );
+          })}
+        </g>
+
+        {/* Continuous flow: dots perpetually streaming along the strongest
+            edges, so the network is always in motion. */}
+        <g>
+          {layout.flowEdges.map((fe, i) => {
+            const focus = isFocusEdge(fe.source, fe.target);
+            if (active && !focus) return null; // when inspecting, only flow the focused edges
+            return (
+              <circle
+                key={i}
+                r={fe.contended ? 2.6 : 2}
+                fill={fe.contended ? palette.ember : palette.bone}
+                opacity={fe.contended ? 0.9 : 0.45}
+              >
+                <animateMotion dur={`${fe.dur}s`} begin={fe.begin} repeatCount="indefinite" path={fe.d} />
+              </circle>
             );
           })}
         </g>
