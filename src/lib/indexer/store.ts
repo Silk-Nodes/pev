@@ -1996,6 +1996,11 @@ export async function refreshCooccurrence(
         `WITH src AS (
            SELECT
              b.timestamp::date AS day,
+             -- A tx is "contended" if it was in any storage conflict
+             -- (it blocked others or was blocked). We carry this flag so
+             -- a pair's conflict_count counts the co-occurrences that
+             -- happened inside contended transactions.
+             (te.inbound_conflicts > 0 OR te.outbound_conflicts > 0) AS conflicted,
              -- Dedup AND drop NULL array elements: a NULL slot makes
              -- LEAST/GREATEST skip it and return the same address for
              -- both sides, producing a c1=c2 self-pair that violates the
@@ -2012,7 +2017,7 @@ export async function refreshCooccurrence(
              AND te.contracts IS NOT NULL
          ),
          filtered AS (
-           SELECT day, cs
+           SELECT day, conflicted, cs
            FROM src
            WHERE array_length(cs, 1) BETWEEN 2 AND $3
          ),
@@ -2020,19 +2025,23 @@ export async function refreshCooccurrence(
            SELECT
              LEAST(x.a, y.b)    AS c1,
              GREATEST(x.a, y.b) AS c2,
-             f.day              AS day
+             f.day              AS day,
+             f.conflicted       AS conflicted
            FROM filtered f
            CROSS JOIN LATERAL unnest(f.cs) WITH ORDINALITY AS x(a, ia)
            CROSS JOIN LATERAL unnest(f.cs) WITH ORDINALITY AS y(b, ib)
            WHERE x.ia < y.ib
              AND x.a <> y.b   -- defensive: never emit a self-pair
          )
-         INSERT INTO contract_pair_daily (c1, c2, day, cooccur_count)
-         SELECT c1, c2, day, count(*)::bigint
+         INSERT INTO contract_pair_daily (c1, c2, day, cooccur_count, conflict_count)
+         SELECT c1, c2, day,
+                count(*)::bigint,
+                count(*) FILTER (WHERE conflicted)::bigint
          FROM pairs
          GROUP BY c1, c2, day
          ON CONFLICT (c1, c2, day) DO UPDATE
-           SET cooccur_count = contract_pair_daily.cooccur_count + EXCLUDED.cooccur_count`,
+           SET cooccur_count  = contract_pair_daily.cooccur_count  + EXCLUDED.cooccur_count,
+               conflict_count = contract_pair_daily.conflict_count + EXCLUDED.conflict_count`,
         [cursor, chunkEnd, maxContractsPerTx],
       );
 

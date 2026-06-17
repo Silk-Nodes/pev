@@ -119,9 +119,10 @@ export default async function GraphPage() {
           how Monad&apos;s protocols actually compose at runtime. Thicker lines
           mean they co-occur more often.{" "}
           <span style={{ color: palette.ember }}>Ember lines</span> are pairs
-          that also collide on storage slots, contention that costs parallelism.
-          Faint lines are pairs that coexist cleanly. Node size is total
-          connection weight; named contracts are ember, unlabelled are grey.
+          that often co-occur inside contended transactions, the storage
+          contention that costs parallelism. Faint lines are pairs that
+          coexist cleanly. Node size is total connection weight; named
+          contracts are ember, unlabelled are grey.
         </p>
       </section>
 
