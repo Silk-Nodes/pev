@@ -68,6 +68,22 @@ export default async function GraphPage() {
   const namedCount = data?.nodes.filter((n) => n.label != null).length ?? 0;
   const contendedEdges = data?.edges.filter((e) => e.conflicts > 0).length ?? 0;
 
+  // Narrative key findings, computed from the same cached data, so the page
+  // answers "what am I looking at?" instead of leaving it to the eye.
+  const labelOf = (addr: string) => {
+    const n = data?.nodes.find((x) => x.address === addr);
+    return n?.label ?? `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  };
+  const findings =
+    data && data.edges.length > 0
+      ? {
+          mostConnected: [...data.nodes].sort((a, b) => b.degree - a.degree)[0],
+          strongest: [...data.edges].sort((a, b) => b.cooccur - a.cooccur)[0],
+          mostContended:
+            data.edges.filter((e) => e.conflicts > 0).sort((a, b) => b.conflicts - a.conflicts)[0] ?? null,
+        }
+      : null;
+
   return (
     <main style={{ padding: "32px clamp(20px, 4vw, 64px) 80px", maxWidth: 1280, margin: "0 auto" }}>
       <SiteHeader
@@ -119,6 +135,39 @@ export default async function GraphPage() {
             <span>{data.totalPairs.toLocaleString()} total pairs in {data.windowDays}d</span>
           </div>
 
+          {/* Key findings: the answers the eye can't extract from the knot. */}
+          {findings && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 12,
+                marginBottom: 20,
+              }}
+            >
+              <Finding
+                label="Most connected"
+                value={findings.mostConnected.label ?? `${findings.mostConnected.address.slice(0, 6)}…${findings.mostConnected.address.slice(-4)}`}
+                detail={`${findings.mostConnected.degree} connections`}
+              />
+              <Finding
+                label="Strongest pair"
+                value={`${labelOf(findings.strongest.source)} ↔ ${labelOf(findings.strongest.target)}`}
+                detail={`${findings.strongest.cooccur.toLocaleString()} co-occurrences`}
+              />
+              {findings.mostContended ? (
+                <Finding
+                  label="Most contended"
+                  value={`${labelOf(findings.mostContended.source)} ↔ ${labelOf(findings.mostContended.target)}`}
+                  detail={`${findings.mostContended.conflicts.toLocaleString()} storage collisions`}
+                  warn
+                />
+              ) : (
+                <Finding label="Storage contention" value="None in window" detail="all pairs coexist cleanly" />
+              )}
+            </div>
+          )}
+
           <CooccurrenceGraph data={data} />
 
           <p style={{ fontSize: 12, color: themeA.subtle, fontFamily: themeA.mono, marginTop: 16 }}>
@@ -154,5 +203,42 @@ export default async function GraphPage() {
 
       <SiteFooter />
     </main>
+  );
+}
+
+/**
+ * One key-finding card: small mono label, a value, and a detail line.
+ * Renders the insights the graph's knot can't convey at a glance.
+ */
+function Finding({
+  label,
+  value,
+  detail,
+  warn = false,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  warn?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        padding: "12px 14px",
+        background: palette.surface02,
+        border: `1px solid ${themeA.border}`,
+        borderRadius: themeA.radius,
+      }}
+    >
+      <div className="pev-eyebrow" style={{ fontSize: 10, color: warn ? palette.ember : themeA.subtle, marginBottom: 6 }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 15, color: themeA.text, fontWeight: 500, lineHeight: 1.25, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {value}
+      </div>
+      <div style={{ fontFamily: themeA.mono, fontSize: 12, color: themeA.muted, marginTop: 4 }}>
+        {detail}
+      </div>
+    </div>
   );
 }

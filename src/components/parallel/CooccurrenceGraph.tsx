@@ -114,6 +114,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
       adj,
       nodeByAddr,
       flowEdges,
+      maxCooccur,
       edgeWidth: (c: number) => 0.4 + 4.6 * Math.sqrt(c / maxCooccur),
       nodeRadius: (w: number) => 3 + 10 * Math.sqrt(w / maxWeight),
     };
@@ -353,8 +354,12 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             const qy = my + (CY - my) * pull;
             const contended = e.conflicts > 0;
             const focus = isFocusEdge(e.source, e.target);
-            let opacity = contended ? 0.5 : 0.14;
-            if (active) opacity = focus ? (contended ? 0.85 : 0.5) : 0.04;
+            // Depth layers: opacity scales with connection strength so the
+            // strongest links read first and weak ones recede (kills the
+            // muddy "one giant ball" look). Contended edges keep a floor.
+            const rel = e.cooccur / layout.maxCooccur;
+            let opacity = contended ? 0.4 + 0.45 * rel : 0.05 + 0.3 * rel;
+            if (active) opacity = focus ? (contended ? 0.9 : 0.55) : 0.03;
             return (
               <path
                 key={i}
