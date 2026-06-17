@@ -102,8 +102,8 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
         return {
           d,
           contended,
-          dur: (contended ? 2.4 : 3.0) + (i % 6) * 0.3,
-          begin: `-${((i * 0.19) % 3).toFixed(2)}s`,
+          dur: (contended ? 1.0 : 1.4) + (i % 6) * 0.12,
+          begin: `-${((i * 0.13) % 2).toFixed(2)}s`,
           source: e.source,
           target: e.target,
         };
@@ -148,7 +148,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
           if (fresh.length) {
             setPings((prev) => [...prev, ...fresh]);
             const ids = new Set(fresh.map((f) => f.id));
-            setTimeout(() => setPings((prev) => prev.filter((p) => !ids.has(p.id))), 1200);
+            setTimeout(() => setPings((prev) => prev.filter((p) => !ids.has(p.id))), 800);
           }
         } catch {
           /* ignore malformed event */
@@ -397,8 +397,8 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
         <g>
           {pings.map((p) => (
             <circle key={p.id} cx={p.x} cy={p.y} r={4} fill="none" stroke={palette.ember} strokeWidth={2.5} opacity={0.7}>
-              <animate attributeName="r" from="4" to="34" dur="1.1s" fill="freeze" />
-              <animate attributeName="opacity" from="0.7" to="0" dur="1.1s" fill="freeze" />
+              <animate attributeName="r" from="4" to="34" dur="0.7s" fill="freeze" />
+              <animate attributeName="opacity" from="0.7" to="0" dur="0.7s" fill="freeze" />
             </circle>
           ))}
         </g>
