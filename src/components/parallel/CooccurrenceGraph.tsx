@@ -63,6 +63,9 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
   // the SSE connection status.
   const [pings, setPings] = useState<{ id: number; x: number; y: number }[]>([]);
   const [live, setLive] = useState<"connecting" | "live" | "offline">("connecting");
+  // View mode: "rel" shows all relationships; "contention" fades clean
+  // pairs and lights up only the ones that co-occur in contended txs.
+  const [view, setView] = useState<"rel" | "contention">("rel");
   const pingId = useRef(0);
   const { nodes, edges } = data;
   const active = pinned ?? hovered;
@@ -87,6 +90,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
     // (the gmonads "energy coursing through the network" feel). Staggered,
     // deterministic timing so SSR and client agree and they don't pulse in
     // lockstep. Heavier / contended edges flow a touch faster + brighter.
+    const maxConflict = Math.max(...edges.map((e) => e.conflicts), 1);
     const flowEdges = [...edges]
       .sort((a, b) => b.cooccur - a.cooccur)
       .slice(0, 72)
@@ -98,11 +102,13 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
         const qx = mx + (CX - mx) * 0.45;
         const qy = my + (CY - my) * 0.45;
         const d = `M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q${qx.toFixed(1)} ${qy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
-        const contended = e.conflicts > 0;
+        // "hot" = meaningful conflict magnitude, not the near-universal
+        // conflicts > 0. Drives the contention-view flow filter + accent.
+        const hot = e.conflicts / maxConflict >= 0.05;
         return {
           d,
-          contended,
-          dur: (contended ? 1.0 : 1.4) + (i % 6) * 0.12,
+          hot,
+          dur: (hot ? 1.0 : 1.4) + (i % 6) * 0.12,
           begin: `-${((i * 0.13) % 2).toFixed(2)}s`,
           source: e.source,
           target: e.target,
@@ -115,6 +121,7 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
       nodeByAddr,
       flowEdges,
       maxCooccur,
+      maxConflict,
       edgeWidth: (c: number) => 0.4 + 4.6 * Math.sqrt(c / maxCooccur),
       nodeRadius: (w: number) => 3 + 10 * Math.sqrt(w / maxWeight),
     };
@@ -274,6 +281,26 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
   const isFocusNode = (addr: string) => !active || addr === active || (neighbours?.has(addr) ?? false);
   const isFocusEdge = (s: string, t: string) => !active || s === active || t === active;
   const activeNode = active ? layout.nodeByAddr.get(active) ?? null : null;
+  const anyContended = edges.some((e) => e.conflicts > 0);
+
+  const ToggleBtn = ({ id, label }: { id: "rel" | "contention"; label: string }) => (
+    <button
+      type="button"
+      onClick={() => setView(id)}
+      style={{
+        padding: "5px 11px",
+        background: view === id ? themeA.btnBg : "transparent",
+        border: "none",
+        color: view === id ? (id === "contention" ? palette.ember : themeA.text) : themeA.subtle,
+        fontFamily: themeA.mono,
+        fontSize: 12,
+        fontWeight: view === id ? 600 : 400,
+        cursor: "pointer",
+      }}
+    >
+      {label}
+    </button>
+  );
 
   return (
     <div style={{ position: "relative" }}>
@@ -284,7 +311,11 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
           color: themeA.muted, minHeight: 28, flexWrap: "wrap",
         }}
       >
-        <span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 12 }}>
+          <span style={{ display: "inline-flex", border: `1px solid ${themeA.border}`, borderRadius: themeA.radius, overflow: "hidden" }}>
+            <ToggleBtn id="rel" label="relationships" />
+            <ToggleBtn id="contention" label="contention" />
+          </span>
           {activeNode ? (
             <>
               <span style={{ color: palette.ember }}>{fullName(activeNode)}</span>
@@ -329,6 +360,24 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
         </span>
       </div>
 
+      {view === "contention" && !anyContended && (
+        <div
+          style={{
+            marginBottom: 8,
+            padding: "8px 12px",
+            background: themeA.hintBg,
+            border: `1px solid ${themeA.border}`,
+            borderRadius: themeA.radius,
+            fontFamily: themeA.mono,
+            fontSize: 12,
+            color: themeA.muted,
+          }}
+        >
+          No contention recorded in this window yet. The contention layer fills once the
+          conflict-count rollup has run.
+        </div>
+      )}
+
       <svg
         ref={svgRef}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
@@ -352,25 +401,44 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             const pull = 0.45;
             const qx = mx + (CX - mx) * pull;
             const qy = my + (CY - my) * pull;
-            const contended = e.conflicts > 0;
             const focus = isFocusEdge(e.source, e.target);
-            // Depth layers: opacity scales with connection strength so the
-            // strongest links read first and weak ones recede (kills the
-            // muddy "one giant ball" look). Contended edges keep a floor.
-            const rel = e.cooccur / layout.maxCooccur;
-            // Floor kept high enough that even the weakest link stays
-            // visible (a node should never look isolated, its nodes are
-            // derived from edges), while strong links still read first.
-            let opacity = contended ? 0.45 + 0.4 * rel : 0.16 + 0.34 * rel;
-            if (active) opacity = focus ? (contended ? 0.9 : 0.6) : 0.04;
+            const relC = e.cooccur / layout.maxCooccur;
+
+            let opacity: number;
+            let stroke: string;
+            let width: number;
+            if (view === "contention") {
+              // Contention view: rank by conflict MAGNITUDE. Nearly every
+              // pair has conflicts > 0 (a tx with 50 contracts flags all its
+              // pairs when one collides), so a binary highlight is useless,
+              // we scale by conflict_count and hard-fade the low end so only
+              // the genuine hotspots glow.
+              stroke = palette.ember;
+              const relX = e.conflicts / layout.maxConflict;
+              if (relX < 0.05) {
+                opacity = 0.02;
+                width = 0.4;
+              } else {
+                opacity = 0.35 + 0.6 * relX;
+                width = 0.8 + 5 * Math.sqrt(relX);
+              }
+              if (active) opacity = focus ? opacity : 0.01;
+            } else {
+              // Relationship view: neutral composability. Depth by
+              // co-occurrence strength; contention lives in the other view.
+              stroke = palette.bone;
+              opacity = 0.12 + 0.4 * relC;
+              if (active) opacity = focus ? 0.7 : 0.03;
+              width = layout.edgeWidth(e.cooccur) * (active && focus ? 1.5 : 1);
+            }
             return (
               <path
                 key={i}
                 d={`M ${a.x.toFixed(1)} ${a.y.toFixed(1)} Q ${qx.toFixed(1)} ${qy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`}
                 fill="none"
-                stroke={contended ? palette.ember : palette.bone}
+                stroke={stroke}
                 strokeOpacity={opacity}
-                strokeWidth={layout.edgeWidth(e.cooccur) * (active && focus ? 1.5 : 1)}
+                strokeWidth={width}
                 strokeLinecap="round"
               />
             );
@@ -383,12 +451,16 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
           {layout.flowEdges.map((fe, i) => {
             const focus = isFocusEdge(fe.source, fe.target);
             if (active && !focus) return null; // when inspecting, only flow the focused edges
+            // Contention view: only the genuinely hot edges stream, in ember.
+            // Relationship view: every strong edge streams, neutral bone.
+            if (view === "contention" && !fe.hot) return null;
+            const ember = view === "contention";
             return (
               <circle
                 key={i}
-                r={fe.contended ? 2.6 : 2}
-                fill={fe.contended ? palette.ember : palette.bone}
-                opacity={fe.contended ? 0.9 : 0.45}
+                r={ember ? 2.6 : 2}
+                fill={ember ? palette.ember : palette.bone}
+                opacity={ember ? 0.9 : 0.5}
               >
                 <animateMotion dur={`${fe.dur}s`} begin={fe.begin} repeatCount="indefinite" path={fe.d} />
               </circle>

@@ -117,12 +117,12 @@ export default async function GraphPage() {
         <p style={{ fontSize: 16, color: themeA.muted, lineHeight: 1.7, maxWidth: "64ch", margin: 0 }}>
           Every line links two contracts that appear in the same transactions,
           how Monad&apos;s protocols actually compose at runtime. Thicker lines
-          mean they co-occur more often.{" "}
-          <span style={{ color: palette.ember }}>Ember lines</span> are pairs
-          that often co-occur inside contended transactions, the storage
-          contention that costs parallelism. Faint lines are pairs that
-          coexist cleanly. Node size is total connection weight; named
-          contracts are ember, unlabelled are grey.
+          mean they co-occur more often; node size is total connection weight.
+          Switch to the{" "}
+          <span style={{ color: palette.ember }}>contention</span> view to see
+          which pairs collide most on storage, the conflicts that cost
+          parallelism, scaled by how often they co-occur amid contention.
+          Named contracts are ember, unlabelled are grey.
         </p>
       </section>
 
