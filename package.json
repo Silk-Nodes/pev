@@ -12,6 +12,7 @@
     "db:status": "tsx --env-file=.env.local --env-file=.env.production.local scripts/migrate.ts --status",
     "db:analyze": "tsx --env-file=.env.local --env-file=.env.production.local scripts/db-analyze.ts",
     "db:activity": "tsx --env-file=.env.local --env-file=.env.production.local scripts/db-activity.ts",
+    "db:kill-slow": "tsx --env-file=.env.local --env-file=.env.production.local scripts/db-kill-slow.ts",
     "db:refresh-contract-index": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-contract-index.ts",
     "indexer": "tsx --env-file=.env.local --env-file=.env.production.local scripts/indexer.ts",
     "indexer:backfill": "tsx --env-file=.env.local --env-file=.env.production.local scripts/indexer.ts --backfill",
