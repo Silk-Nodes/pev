@@ -29,8 +29,8 @@ async function main(): Promise<number> {
     console.error("usage: npm run audit:contract -- 0x<40-hex-address> [--window=7] [--timeout=25000]");
     return 1;
   }
-  const windowDays = Number(arg("window")) || 7;
-  const timeoutMs = Number(arg("timeout")) || 25_000;
+  const windowDays = Number(arg("window")) || 2;
+  const timeoutMs = Number(arg("timeout")) || 35_000;
 
   console.log(
     `[audit] building for ${address} · window=${windowDays}d · per-query timeout=${timeoutMs}ms`,

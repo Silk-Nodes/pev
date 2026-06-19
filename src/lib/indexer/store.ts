@@ -2343,8 +2343,12 @@ export async function refreshContractAudit(
   addressHex: string,
   opts: { windowDays?: number; timeoutMs?: number } = {},
 ): Promise<ContractAudit> {
-  const windowDays = opts.windowDays ?? 7;
-  const timeoutMs = opts.timeoutMs ?? 25_000;
+  // Default 2-day window: a busy contract (millions of txs/week) blows the
+  // statement budget on a full 7-day aggregate. 2 days completes reliably
+  // and is still a huge, representative sample. Callers can widen it when
+  // the DB is calm, at the risk of timeouts (which degrade gracefully).
+  const windowDays = opts.windowDays ?? 2;
+  const timeoutMs = opts.timeoutMs ?? 35_000;
   const address = addressHex.toLowerCase();
   const buf = hexToBuffer(address);
   const bareHex = address.slice(2); // for shared_slots LIKE match
