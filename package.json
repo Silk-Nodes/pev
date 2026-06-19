@@ -19,6 +19,7 @@
     "analytics:refresh": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-analytics.ts",
     "cooccurrence:refresh": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-cooccurrence.ts",
     "cooccurrence:graph": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-cooccurrence-graph.ts",
+    "audit:contract": "tsx --env-file=.env.local --env-file=.env.production.local scripts/contract-audit.ts",
     "labels:sync": "tsx --env-file=.env.local --env-file=.env.production.local scripts/sync-contract-labels.ts",
     "weekly-improvers": "tsx --env-file=.env.local --env-file=.env.production.local scripts/weekly-improvers.ts",
     "contract-daily": "tsx --env-file=.env.local --env-file=.env.production.local scripts/contract-daily.ts",

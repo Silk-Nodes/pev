@@ -2288,5 +2288,218 @@ export async function writeCooccurrenceCache(
   );
 }
 
+// ─── per-contract contention audit ──────────────────────────────
+// The data behind /audit/[address]: a real, slot-level root-cause read
+// of a single contract's storage contention. Built by the gentle
+// precompute (scripts/contract-audit.ts) and cached; the page reads the
+// cache only. Every aggregate is bounded by a statement_timeout and runs
+// sequentially (NOT concurrently) so it can never starve the live
+// indexer on the shared DB. See [[pev-db-contention]].
+
+export interface AuditHotSlot {
+  /** 0x-prefixed storage slot key */
+  slot: string;
+  conflicts: number;
+  touches: number;
+  /** 0..1, peak normalized contention seen for this slot */
+  contention: number;
+}
+export interface AuditMethod {
+  /** 4-byte selector, 0x-prefixed */
+  selector: string;
+  txCount: number;
+  conflicts: number;
+}
+export interface AuditKind {
+  kind: string; // 'write-write' | 'read-write' | 'mixed'
+  count: number;
+}
+export interface ContractAudit {
+  address: string;
+  label: string | null;
+  windowDays: number;
+  refreshedAt: string; // ISO
+  totals: {
+    txs: number | null;
+    conflicts: number | null;
+    /** conflicts / txs, 0..1, null if either side missing */
+    conflictRate: number | null;
+  };
+  hotSlots: AuditHotSlot[];
+  methods: AuditMethod[];
+  kinds: AuditKind[];
+  /** true if one or more aggregates timed out and were skipped */
+  partial: boolean;
+}
+
+/**
+ * Build the contention audit for one contract. Gentle by construction:
+ * each query is on its own connection with a hard statement_timeout and
+ * runs one-at-a-time. A query that exceeds budget is caught, that section
+ * is left empty, and `partial` flips true, the report degrades, it never
+ * hangs or piles up load.
+ */
+export async function refreshContractAudit(
+  addressHex: string,
+  opts: { windowDays?: number; timeoutMs?: number } = {},
+): Promise<ContractAudit> {
+  const windowDays = opts.windowDays ?? 7;
+  const timeoutMs = opts.timeoutMs ?? 25_000;
+  const address = addressHex.toLowerCase();
+  const buf = hexToBuffer(address);
+  const bareHex = address.slice(2); // for shared_slots LIKE match
+  const blocksPerDay = 175_000;
+
+  const tip = await queryOne<{ m: string | null }>(
+    `SELECT max(number)::text AS m FROM blocks`,
+  );
+  const tipBlock = tip?.m ? parseInt(tip.m, 10) : 0;
+  const fromBlock = Math.max(0, tipBlock - blocksPerDay * windowDays);
+  // Kind sampling is the only query touching the big conflicts table via
+  // a JSONB text match, so we sample a SHORT recent window to keep it cheap.
+  const kindFromBlock = Math.max(0, tipBlock - blocksPerDay * Math.min(windowDays, 1));
+
+  let partial = false;
+  const guarded = async <T extends Record<string, unknown>>(
+    text: string,
+    params: unknown[],
+  ): Promise<T[]> => {
+    try {
+      const { rows } = await runWithStatementTimeout<T>(timeoutMs, text, params);
+      return rows;
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      // 57014 = query_canceled (hit the timeout). Anything else we also
+      // swallow into a partial report rather than fail the whole audit.
+      console.warn(
+        `[audit] query degraded (${code ?? "err"}): ${(err as Error).message}`,
+      );
+      partial = true;
+      return [];
+    }
+  };
+
+  // 1. Totals: txs touching the contract + conflicts they caused.
+  const totalsRows = await guarded<{ txs: string; conflicts: string | null }>(
+    `SELECT count(*)::text AS txs,
+            sum(outbound_conflicts)::text AS conflicts
+       FROM tx_executions
+      WHERE $1 = ANY(contracts) AND block_number > $2`,
+    [buf, fromBlock],
+  );
+  const txs = totalsRows[0]?.txs ? parseInt(totalsRows[0].txs, 10) : null;
+  const conflicts = totalsRows[0]?.conflicts != null ? parseInt(totalsRows[0].conflicts, 10) : null;
+
+  // 2. Hot slots: the exact storage slots driving contention.
+  const slotRows = await guarded<{
+    slot: Buffer;
+    conflicts: string;
+    touches: string;
+    contention: string;
+  }>(
+    `SELECT slot,
+            sum(conflicts_caused)::text AS conflicts,
+            sum(touches)::text          AS touches,
+            max(contention)::text       AS contention
+       FROM block_hot_slots
+      WHERE contract = $1 AND block_number > $2
+      GROUP BY slot
+      ORDER BY sum(conflicts_caused) DESC
+      LIMIT 16`,
+    [buf, fromBlock],
+  );
+  const hotSlots: AuditHotSlot[] = slotRows.map((r) => ({
+    slot: bufferToHex(r.slot),
+    conflicts: parseInt(r.conflicts, 10),
+    touches: parseInt(r.touches, 10),
+    contention: parseFloat(r.contention) || 0,
+  }));
+
+  // 3. Methods: which functions on this contract cause the conflicts.
+  const methodRows = await guarded<{
+    method_selector: Buffer | null;
+    tx_count: string;
+    conflicts: string | null;
+  }>(
+    `SELECT method_selector,
+            count(*)::text                AS tx_count,
+            sum(outbound_conflicts)::text AS conflicts
+       FROM tx_executions
+      WHERE $1 = ANY(contracts) AND block_number > $2
+        AND method_selector IS NOT NULL
+      GROUP BY method_selector
+      ORDER BY sum(outbound_conflicts) DESC NULLS LAST, count(*) DESC
+      LIMIT 8`,
+    [buf, fromBlock],
+  );
+  const methods: AuditMethod[] = methodRows
+    .filter((r) => r.method_selector)
+    .map((r) => ({
+      selector: bufferToHex(r.method_selector as Buffer),
+      txCount: parseInt(r.tx_count, 10),
+      conflicts: r.conflicts != null ? parseInt(r.conflicts, 10) : 0,
+    }));
+
+  // 4. Conflict kinds (best-effort, short window). The conflicts table is
+  //    big and only matchable on this contract via a JSONB text search, so
+  //    this is the most likely query to be skipped on a busy contract.
+  const kindRows = await guarded<{ kind: string; count: string }>(
+    `SELECT kind, count(*)::text AS count
+       FROM conflicts
+      WHERE block_number > $1
+        AND shared_slots::text LIKE $2
+      GROUP BY kind
+      ORDER BY count(*) DESC`,
+    [kindFromBlock, `%${bareHex}%`],
+  );
+  const kinds: AuditKind[] = kindRows.map((r) => ({
+    kind: r.kind,
+    count: parseInt(r.count, 10),
+  }));
+
+  const labelMap = await resolveManyContracts([address]);
+  const label = labelMap.get(address) ?? null;
+
+  const conflictRate =
+    txs != null && txs > 0 && conflicts != null ? conflicts / txs : null;
+
+  return {
+    address,
+    label,
+    windowDays,
+    refreshedAt: new Date().toISOString(),
+    totals: { txs, conflicts, conflictRate },
+    hotSlots,
+    methods,
+    kinds,
+    partial,
+  };
+}
+
+/** Upsert a built audit into the cache. */
+export async function writeContractAudit(audit: ContractAudit): Promise<void> {
+  await query(
+    `INSERT INTO contract_audit_cache (contract, window_days, data, refreshed_at)
+       VALUES ($1, $2, $3::jsonb, NOW())
+     ON CONFLICT (contract) DO UPDATE
+       SET window_days = EXCLUDED.window_days,
+           data = EXCLUDED.data,
+           refreshed_at = NOW()`,
+    [hexToBuffer(audit.address), audit.windowDays, JSON.stringify(audit)],
+  );
+}
+
+/** Read a cached audit (single PK lookup, page-safe). */
+export async function getContractAudit(
+  addressHex: string,
+): Promise<{ audit: ContractAudit; refreshedAt: Date } | null> {
+  const row = await queryOne<{ data: ContractAudit; refreshed_at: Date }>(
+    `SELECT data, refreshed_at FROM contract_audit_cache WHERE contract = $1`,
+    [hexToBuffer(addressHex.toLowerCase())],
+  );
+  if (!row) return null;
+  return { audit: row.data, refreshedAt: row.refreshed_at };
+}
+
 // Re-export the conflict kind so callers don't need two imports
 export type { ConflictKind, PEVStatus };

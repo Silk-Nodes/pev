@@ -205,12 +205,12 @@ export default function ShowcasePage() {
           Nodes.
         </p>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link href="/graph" className="pev-graph-cta">
-            See the live graph →
+          <Link href="/audit/0x34b6552d57a35a1d042ccae1951bd1c370112a6f" className="pev-graph-cta">
+            See a live audit →
           </Link>
-          <Link href={`/contract/${SUBJECT.address}`} className="pev-link" style={{ alignSelf: "center" }}>
-            Open this contract in pev
-          </Link>
+          <a href="mailto:info@silknodes.io?subject=pev%20protocol%20audit" className="pev-link" style={{ alignSelf: "center" }}>
+            Request a protocol audit
+          </a>
         </div>
       </section>
 
