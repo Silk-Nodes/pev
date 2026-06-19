@@ -1874,3 +1874,117 @@ export function renderGraphCard(data: GraphCardData, scale: number = 1): React.R
     </div>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════
+   SHOWCASE CARD, unfurl for /showcase (the protocol-audit use case)
+   ════════════════════════════════════════════════════════════════ */
+
+export interface ShowcaseCardData {
+  /** featured contract label (e.g. "Perpl") */
+  subject: string;
+  /** re-executions forced over the window (the headline cost) */
+  reexecs: number;
+  /** conflicts per transaction (the measured density) */
+  conflictsPerTx: number;
+  /** transactions touched over the window */
+  txs: number;
+  footer: { host: string; path: string };
+}
+
+export function renderShowcaseCard(
+  data: ShowcaseCardData,
+  variant: CardVariant,
+): React.ReactElement {
+  const c = colorsFor(variant);
+  const compact = (n: number) =>
+    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${Math.round(n / 1000)}K` : `${n}`;
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: c.bg,
+        color: c.text,
+        fontFamily: "Inter Tight",
+        padding: "56px 72px",
+        position: "relative",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+        <Lockup colors={c} />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            fontFamily: "JetBrains Mono",
+            fontSize: 13,
+            color: c.subtle,
+            letterSpacing: "0.18em",
+          }}
+        >
+          <span>CONTRACT</span>
+          <span style={{ marginTop: 2 }}>PERFORMANCE AUDIT</span>
+        </div>
+      </div>
+
+      <div style={{ width: "100%", height: 1, background: c.line, marginTop: 32 }} />
+
+      <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", marginTop: 12 }}>
+        <div
+          style={{
+            fontFamily: "JetBrains Mono",
+            fontSize: 14,
+            color: c.subtle,
+            letterSpacing: "0.18em",
+            marginBottom: 18,
+          }}
+        >
+          MEASURED ON MONAD MAINNET
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            fontFamily: "Instrument Serif",
+            fontStyle: "italic",
+            fontSize: 72,
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+            color: c.text,
+          }}
+        >
+          <span>{"What's quietly"}</span>
+          <span style={{ marginTop: 8, display: "flex", alignItems: "baseline" }}>
+            <span style={{ color: c.terracotta }}>throttling</span>
+            <span style={{ marginLeft: "0.3em" }}>{"your protocol?"}</span>
+          </span>
+        </div>
+        <div
+          style={{
+            fontFamily: "Inter Tight",
+            fontSize: 22,
+            lineHeight: 1.35,
+            color: c.muted,
+            marginTop: 18,
+            maxWidth: 880,
+          }}
+        >
+          Where your contract collides on storage, what it costs, and how to fix it.
+        </div>
+      </div>
+
+      <div style={{ width: "100%", height: 1, background: c.line, marginTop: 40 }} />
+
+      <div style={{ display: "flex", width: "100%", alignItems: "flex-end", marginTop: 24 }}>
+        <Stat colors={c} number={compact(data.reexecs)} label={`${data.subject.toUpperCase()} · RE-EXECUTIONS`} highlight={c.terracotta} />
+        <Stat colors={c} number={data.conflictsPerTx.toFixed(2)} label="CONFLICTS PER TX" />
+        <Stat colors={c} number={compact(data.txs)} label="TRANSACTIONS · 2 DAYS" last />
+      </div>
+
+      <FooterBand colors={c} host={data.footer.host} path={data.footer.path} />
+    </div>
+  );
+}

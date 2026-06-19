@@ -31,6 +31,14 @@ export const metadata: Metadata = {
       "Where a Monad contract collides on storage, what it costs, and how to fix it. pev's parallel-execution profiler, with a live worked example.",
     type: "website",
     url: "/showcase",
+    images: [{ url: "/og/showcase", width: 1200, height: 630, alt: "pev contract performance audit" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "What pev shows a protocol team",
+    description:
+      "Where a Monad contract collides on storage, what it costs, and how to fix it. pev's parallel-execution profiler.",
+    images: ["/og/showcase"],
   },
 };
 
