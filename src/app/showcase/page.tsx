@@ -54,7 +54,7 @@ export default async function ShowcasePage() {
   }
 
   return (
-    <main style={{ padding: "32px clamp(20px, 4vw, 64px) 96px", maxWidth: 1100, margin: "0 auto" }}>
+    <main style={{ padding: "32px clamp(20px, 4vw, 64px) 80px", maxWidth: 1280, margin: "0 auto" }}>
       <SiteHeader
         variant="internal"
         tagline="What pev shows your team"
