@@ -18,7 +18,6 @@ const fmtCompact = (n: number) =>
 
 export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refreshedAt?: Date }) {
   const dx = diagnose(audit);
-  const ratePct = audit.totals.conflictRate != null ? Math.round(audit.totals.conflictRate * 100) : null;
   const maxSlot = Math.max(...audit.hotSlots.map((s) => s.conflicts), 1);
   const maxMethod = Math.max(...audit.methods.map((m) => m.conflicts), 1);
   const totalKinds = audit.kinds.reduce((a, k) => a + k.count, 0) || 1;
@@ -26,21 +25,24 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
   return (
     <div>
       {/* subject line */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
         <span style={{ fontSize: 18, color: themeA.text, fontWeight: 600 }}>{audit.label ?? short(audit.address)}</span>
         <span style={{ fontFamily: themeA.mono, fontSize: 12, color: themeA.subtle }}>{short(audit.address)}</span>
+        <span style={{ fontFamily: themeA.mono, fontSize: 11, color: palette.sage, border: `1px solid rgba(168,196,135,0.3)`, borderRadius: themeA.radius, padding: "2px 8px" }}>
+          ✓ measured on-chain
+        </span>
       </div>
 
-      {/* headline numbers */}
+      {/* headline numbers, all measured */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 24 }}>
         <Stat big={audit.totals.txs != null ? fmtCompact(audit.totals.txs) : "—"} label="transactions touched" sub={audit.totals.txs != null ? `${fmt(audit.totals.txs)} in ${audit.windowDays}d` : "not sampled"} />
-        <Stat big={audit.totals.conflicts != null ? fmtCompact(audit.totals.conflicts) : "—"} label="storage collisions" sub={audit.totals.conflicts != null ? `${fmt(audit.totals.conflicts)} re-runs forced` : "not sampled"} warn />
-        <Stat big={ratePct != null ? `${ratePct}%` : "—"} label="collision rate" sub={ratePct != null ? `~${ratePct >= 60 ? "2 in 3" : ratePct >= 35 ? "1 in 3" : "some"} transactions` : "not sampled"} warn />
+        <Stat big={audit.totals.conflicts != null ? fmtCompact(audit.totals.conflicts) : "—"} label="re-executions forced" sub={audit.totals.conflicts != null ? `${fmt(audit.totals.conflicts)} storage collisions` : "not sampled"} warn />
+        <Stat big={audit.totals.conflictRate != null ? audit.totals.conflictRate.toFixed(2) : "—"} label="conflicts per transaction" sub={audit.totals.conflictRate != null ? `measured · ${audit.windowDays}d window` : "not sampled"} warn />
       </div>
 
-      {/* diagnosis */}
+      {/* diagnosis: measured signals + an inferred reading */}
       <SubHead>The diagnosis</SubHead>
-      <div style={{ padding: "16px 18px", background: palette.surface02, borderLeft: `3px solid ${palette.terracotta}`, borderRadius: themeA.radius, maxWidth: "70ch", marginBottom: 28 }}>
+      <div style={{ padding: "16px 18px", background: palette.surface02, borderLeft: `3px solid ${palette.terracotta}`, borderRadius: themeA.radius, maxWidth: "70ch", marginBottom: 12 }}>
         <p style={{ fontSize: 16, color: themeA.text, lineHeight: 1.55, margin: "0 0 12px" }}>{dx.headline}</p>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 12.5, color: themeA.muted, fontFamily: themeA.mono }}>
           {dx.hottestSlot && <span>hottest slot <strong style={{ color: palette.ember }}>{shortSlot(dx.hottestSlot)}</strong>{dx.hottestSlotConflicts != null ? ` · ${fmt(dx.hottestSlotConflicts)}` : ""}</span>}
@@ -48,6 +50,11 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
           {dx.topMethod && <span>top method <strong style={{ color: themeA.text }}>{dx.topMethod}</strong></span>}
         </div>
       </div>
+      <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6, maxWidth: "70ch", marginBottom: 28 }}>
+        The slot, kind and method above are measured. What the slot <em>holds</em> is inferred from its
+        access pattern, the 32-byte key is most likely a mapping or array entry, so it&apos;s a specific
+        shared resource rather than a global variable. Confirming it needs the contract&apos;s source.
+      </p>
 
       {/* heatmap */}
       {audit.hotSlots.length > 0 && (
@@ -73,8 +80,13 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
         </>
       )}
 
-      {/* the fix */}
-      <SubHead>The fix · {dx.fix.title}</SubHead>
+      {/* the fix, explicitly a candidate, not a verified change */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+        <span className="pev-eyebrow">Candidate fix · {dx.fix.title}</span>
+        <span style={{ fontFamily: themeA.mono, fontSize: 11, color: palette.amber, border: `1px solid rgba(212,169,74,0.3)`, borderRadius: themeA.radius, padding: "2px 8px" }}>
+          needs review
+        </span>
+      </div>
       <p style={{ fontSize: 15, color: themeA.muted, lineHeight: 1.7, maxWidth: "64ch", margin: "0 0 16px" }}>{dx.fix.rationale}</p>
       <FixDiagram />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 14, marginTop: 16 }}>
@@ -82,8 +94,10 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
         <CodeCard label="After" tone="good" code={dx.fix.after} />
       </div>
       <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6, maxWidth: "64ch", marginTop: 12 }}>
-        Illustrative pattern for the contention measured, not your exact code. Your team maps the slot
-        to its variable instantly; Silk Nodes can do the rewrite and verify the drop.
+        A starting point, the common remedy for the conflict pattern we measured, not a verified fix.
+        Because the hot slot looks like a mapping or array entry, the right change depends on what it
+        actually holds. Your team knows instantly; Silk Nodes can confirm the remedy and verify the
+        contention drop on-chain.
       </p>
 
       {/* methods + kinds */}
