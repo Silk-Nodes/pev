@@ -334,3 +334,36 @@ body {
 .pev-live-dot {
   animation: pev-live-pulse 2s ease-in-out infinite;
 }
+
+/* "new" badge on the showcase nav CTA, a small glowing ember pill that
+   pulses to draw attention to the launch. */
+.pev-new-badge {
+  font-family: var(--font-pev-mono), "JetBrains Mono", ui-monospace, monospace;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #1a0f08;
+  background: #e28c52;
+  border-radius: 3px;
+  padding: 1px 5px;
+  line-height: 1.5;
+  animation: pev-new-glow 1.8s ease-in-out infinite;
+}
+@keyframes pev-new-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(226, 140, 82, 0); }
+  50% { box-shadow: 0 0 11px 2px rgba(226, 140, 82, 0.6); }
+}
+/* The whole showcase link gets a soft ember text-glow that breathes. */
+.pev-showcase-cta {
+  color: #e28c52 !important;
+  animation: pev-showcase-breathe 2.6s ease-in-out infinite;
+}
+@keyframes pev-showcase-breathe {
+  0%, 100% { text-shadow: 0 0 0 rgba(226, 140, 82, 0); }
+  50% { text-shadow: 0 0 8px rgba(226, 140, 82, 0.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pev-new-badge,
+  .pev-showcase-cta { animation: none; }
+}

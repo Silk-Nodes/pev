@@ -231,6 +231,24 @@ export default function SiteHeader({
           }}
         >
           <Link
+            href="/showcase"
+            className="pev-link pev-showcase-cta"
+            style={{
+              fontFamily: themeA.mono,
+              fontSize: 11,
+              color: themeA.accent,
+              textDecoration: "none",
+              whiteSpace: "nowrap",
+              letterSpacing: "0.05em",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            showcase
+            <span className="pev-new-badge">new</span>
+          </Link>
+          <Link
             href="/graph"
             className="pev-link"
             style={{
