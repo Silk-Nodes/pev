@@ -2358,6 +2358,11 @@ export async function refreshContractAudit(
   // Kind sampling is the only query touching the big conflicts table via
   // a JSONB text match, so we sample a SHORT recent window to keep it cheap.
   const kindFromBlock = Math.max(0, tipBlock - blocksPerDay * Math.min(windowDays, 1));
+  // Hot-slot aggregation over a busy contract's full window can blow the
+  // statement budget (millions of block_hot_slots rows). A recent 2-day
+  // sample is representative and far cheaper, so the heatmap reliably
+  // populates without straining the indexer DB.
+  const slotFromBlock = Math.max(0, tipBlock - blocksPerDay * Math.min(windowDays, 2));
 
   let partial = false;
   const guarded = async <T extends Record<string, unknown>>(
@@ -2406,7 +2411,7 @@ export async function refreshContractAudit(
       GROUP BY slot
       ORDER BY sum(conflicts_caused) DESC
       LIMIT 16`,
-    [buf, fromBlock],
+    [buf, slotFromBlock],
   );
   const hotSlots: AuditHotSlot[] = slotRows.map((r) => ({
     slot: bufferToHex(r.slot),
