@@ -50,11 +50,21 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
           {dx.topMethod && <span>top method <strong style={{ color: themeA.text }}>{dx.topMethod}</strong></span>}
         </div>
       </div>
-      <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6, maxWidth: "70ch", marginBottom: 28 }}>
+      <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6, maxWidth: "70ch", marginBottom: 24 }}>
         The slot, kind and method above are measured. What the slot <em>holds</em> is inferred from its
-        access pattern, the 32-byte key is most likely a mapping or array entry, so it&apos;s a specific
-        shared resource rather than a global variable. Confirming it needs the contract&apos;s source.
+        shape, it {dx.slotRole}. Confirming the exact variable needs the contract&apos;s source.
       </p>
+
+      {/* measured impact, the hot slot's own conflict count = recoverable work */}
+      {dx.recoverable != null && dx.recoverable > 0 && (
+        <div style={{ display: "flex", gap: 16, alignItems: "baseline", flexWrap: "wrap", padding: "16px 18px", background: palette.surface02, borderLeft: `3px solid ${palette.ember}`, borderRadius: themeA.radius, maxWidth: "70ch", marginBottom: 28 }}>
+          <span style={{ fontFamily: "var(--font-pev-mono), monospace", fontSize: 26, color: palette.ember, fontWeight: 600 }}>{fmt(dx.recoverable)}</span>
+          <span style={{ fontSize: 14, color: themeA.text, lineHeight: 1.5 }}>
+            re-executions this one slot forced in the window <span style={{ color: themeA.subtle }}>(measured)</span>. Resolving its
+            contention recovers up to that much wasted work, the single highest-leverage fix on this contract.
+          </span>
+        </div>
+      )}
 
       {/* heatmap */}
       {audit.hotSlots.length > 0 && (
@@ -94,10 +104,9 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
         <CodeCard label="After" tone="good" code={dx.fix.after} />
       </div>
       <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6, maxWidth: "64ch", marginTop: 12 }}>
-        A starting point, the common remedy for the conflict pattern we measured, not a verified fix.
-        Because the hot slot looks like a mapping or array entry, the right change depends on what it
-        actually holds. Your team knows instantly; Silk Nodes can confirm the remedy and verify the
-        contention drop on-chain.
+        The diagnosis and this fix direction are measured and free. The exact change depends on what
+        the slot holds, so the precise implementation, mapped to your variables and the verified
+        on-chain contention drop, is the Silk Nodes audit. Your team confirms the slot in seconds.
       </p>
 
       {/* methods + kinds */}
