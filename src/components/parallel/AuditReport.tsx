@@ -55,14 +55,28 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
         shape, it {dx.slotRole}. Confirming the exact variable needs the contract&apos;s source.
       </p>
 
-      {/* measured impact, the hot slot's own conflict count = recoverable work */}
+      {/* measured impact → business translation */}
       {dx.recoverable != null && dx.recoverable > 0 && (
-        <div style={{ display: "flex", gap: 16, alignItems: "baseline", flexWrap: "wrap", padding: "16px 18px", background: palette.surface02, borderLeft: `3px solid ${palette.ember}`, borderRadius: themeA.radius, maxWidth: "70ch", marginBottom: 28 }}>
-          <span style={{ fontFamily: "var(--font-pev-mono), monospace", fontSize: 26, color: palette.ember, fontWeight: 600 }}>{fmt(dx.recoverable)}</span>
-          <span style={{ fontSize: 14, color: themeA.text, lineHeight: 1.5 }}>
-            re-executions this one slot forced in the window <span style={{ color: themeA.subtle }}>(measured)</span>. Resolving its
-            contention recovers up to that much wasted work, the single highest-leverage fix on this contract.
-          </span>
+        <div style={{ padding: "18px 20px", background: palette.surface02, borderLeft: `3px solid ${palette.ember}`, borderRadius: themeA.radius, maxWidth: "70ch", marginBottom: 28 }}>
+          <div style={{ fontSize: 19, color: themeA.text, fontWeight: 600, lineHeight: 1.4, marginBottom: 14 }}>
+            Every collision is work the chain did twice.
+          </div>
+          <div style={{ display: "flex", gap: 14, alignItems: "baseline", flexWrap: "wrap", marginBottom: 14 }}>
+            <span style={{ fontFamily: "var(--font-pev-mono), monospace", fontSize: 28, color: palette.ember, fontWeight: 600 }}>{fmt(dx.recoverable)}</span>
+            <span style={{ fontSize: 14, color: themeA.text, lineHeight: 1.5 }}>
+              re-executions this one slot forced <span style={{ color: themeA.subtle }}>(measured)</span>. Resolving it recovers up to that much wasted work.
+            </span>
+          </div>
+          <div style={{ fontSize: 13.5, color: themeA.muted, lineHeight: 1.5 }}>
+            What that costs you on a parallel chain:
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 20px", marginTop: 8 }}>
+            {["transactions that can't fully parallelize", "lower throughput under load", "higher latency during spikes", "less headroom to scale"].map((t) => (
+              <span key={t} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 13.5, color: themeA.text }}>
+                <span style={{ color: palette.terracotta }}>→</span> {t}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

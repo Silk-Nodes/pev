@@ -124,29 +124,48 @@ export default async function ShowcasePage() {
         </div>
       </section>
 
-      {/* ── Why it matters ────────────────────────────────────────── */}
+      {/* ── The moat ──────────────────────────────────────────────── */}
       <section style={{ marginTop: 44 }}>
-        <div className="pev-eyebrow" style={{ marginBottom: 8 }}>Why it matters</div>
-        <h2 style={{ fontSize: "clamp(22px, 3vw, 30px)", color: themeA.text, margin: "0 0 14px", letterSpacing: "-0.01em" }}>
-          Every collision is work the chain did twice
+        <div className="pev-eyebrow" style={{ marginBottom: 8 }}>Why only pev</div>
+        <h2 style={{ fontSize: "clamp(22px, 3vw, 30px)", color: themeA.text, margin: "0 0 18px", letterSpacing: "-0.01em" }}>
+          Nobody else can show you this
         </h2>
-        <p style={{ fontSize: 16, color: themeA.muted, lineHeight: 1.7, maxWidth: "62ch" }}>
-          Monad executes optimistically in parallel, then re-runs any transaction whose reads or
-          writes conflicted with an earlier one. High contention means more re-execution: wasted
-          compute, higher latency under load, and a lower <em>effective</em> throughput than the chain
-          could deliver. Cutting contention is the single highest-leverage performance win for a busy
-          contract, and almost nobody can see it today. pev can.
-        </p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 10, marginBottom: 16 }}>
+          {[
+            "No block explorer shows storage contention.",
+            "No analytics dashboard reconstructs it.",
+            "No RPC exposes which slot collided.",
+            "pev rebuilds it from Monad's execution traces, block by block.",
+          ].map((t, i) => (
+            <div key={t} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "12px 14px", background: i === 3 ? themeA.hintBg : palette.surface02, border: `1px solid ${themeA.border}`, borderRadius: themeA.radius }}>
+              <span style={{ color: i === 3 ? palette.sage : palette.terracotta, fontSize: 15 }}>{i === 3 ? "✓" : "✕"}</span>
+              <span style={{ fontSize: 14, color: themeA.text, lineHeight: 1.45 }}>{t}</span>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* ── CTA ───────────────────────────────────────────────────── */}
       <section style={{ marginTop: 44, padding: "30px clamp(20px, 4vw, 44px)", background: themeA.hintBg, border: `1px solid ${themeA.border}`, borderRadius: themeA.radius }}>
         <h2 style={{ fontSize: 24, color: themeA.text, margin: "0 0 10px", letterSpacing: "-0.01em" }}>Audit your contract</h2>
-        <p style={{ fontSize: 15, color: themeA.muted, lineHeight: 1.6, maxWidth: "58ch", margin: "0 0 20px" }}>
-          We&apos;ll identify your biggest contention sources, the contracts colliding with you, the
-          storage slots forcing re-execution, and the architecture changes with the highest ROI, all
-          from Monad mainnet data. Built by Silk Nodes.
+        <p style={{ fontSize: 15, color: themeA.muted, lineHeight: 1.6, maxWidth: "58ch", margin: "0 0 18px" }}>
+          A full contention review of your protocol, from Monad mainnet data. Silk Nodes is your
+          performance partner, not just a node operator.
         </p>
+        <div style={{ fontFamily: themeA.mono, fontSize: 11, color: themeA.subtle, letterSpacing: "0.06em", marginBottom: 10 }}>WHAT YOU RECEIVE</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(230px, 1fr))", gap: 8, marginBottom: 22 }}>
+          {[
+            "30-minute review call",
+            "Full contention report",
+            "Storage-slot + method analysis",
+            "Architecture recommendations",
+            "Before/after contention estimates",
+          ].map((d) => (
+            <div key={d} style={{ display: "flex", gap: 9, alignItems: "center", fontSize: 14, color: themeA.text }}>
+              <span style={{ color: palette.sage }}>✓</span> {d}
+            </div>
+          ))}
+        </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
           <a href="mailto:info@silknodes.io?subject=pev%20protocol%20audit" className="pev-graph-cta">
             Request a protocol audit →
