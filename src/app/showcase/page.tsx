@@ -17,8 +17,10 @@ import SiteFooter from "@/components/site/SiteFooter";
 
 export const dynamic = "force-dynamic";
 
-// The flagship contract for the worked example.
-const FEATURED = "0x34b6552d57a35a1d042ccae1951bd1c370112a6f"; // Perpl
+// The flagship contract for the worked example. MarginAccount: the chain's
+// top contention node AND verified-source, so the audit shows the exact,
+// source-backed diagnosis + fix (see src/lib/audit/verified.ts).
+const FEATURED = "0x57cf97fe1fac7d78b07e7e0761410cb2e91f0ca7"; // MarginAccount
 
 export const metadata: Metadata = {
   title: { absolute: "What pev shows a protocol team: contention, costed and fixed" },

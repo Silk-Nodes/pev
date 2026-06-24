@@ -1,4 +1,5 @@
 import { diagnose } from "@/lib/audit/diagnose";
+import { getVerifiedAnalysis } from "@/lib/audit/verified";
 import type { ContractAudit } from "@/lib/indexer/store";
 import { themeA, palette } from "@/components/parallel/theme";
 
@@ -18,6 +19,10 @@ const fmtCompact = (n: number) =>
 
 export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refreshedAt?: Date }) {
   const dx = diagnose(audit);
+  // Verified, source-backed analysis takes precedence over the inferred one.
+  const va = getVerifiedAnalysis(audit.address);
+  const headline = va?.headline ?? dx.headline;
+  const fix = va?.fix ?? dx.fix;
   const maxSlot = Math.max(...audit.hotSlots.map((s) => s.conflicts), 1);
   const maxMethod = Math.max(...audit.methods.map((m) => m.conflicts), 1);
   const totalKinds = audit.kinds.reduce((a, k) => a + k.count, 0) || 1;
@@ -31,6 +36,11 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
         <span style={{ fontFamily: themeA.mono, fontSize: 11, color: palette.sage, border: `1px solid rgba(168,196,135,0.3)`, borderRadius: themeA.radius, padding: "2px 8px" }}>
           ✓ measured on-chain
         </span>
+        {va && (
+          <span style={{ fontFamily: themeA.mono, fontSize: 11, color: palette.ember, border: `1px solid rgba(226,140,82,0.4)`, borderRadius: themeA.radius, padding: "2px 8px" }}>
+            ✓ verified source · {va.source}
+          </span>
+        )}
       </div>
 
       {/* headline numbers, all measured */}
@@ -40,20 +50,28 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
         <Stat big={audit.totals.conflictRate != null ? audit.totals.conflictRate.toFixed(2) : "—"} label="conflicts per transaction" sub={audit.totals.conflictRate != null ? `measured · ${audit.windowDays}d window` : "not sampled"} warn />
       </div>
 
-      {/* diagnosis: measured signals + an inferred reading */}
+      {/* diagnosis: measured signals + reading (verified source if we have it) */}
       <SubHead>The diagnosis</SubHead>
       <div style={{ padding: "16px 18px", background: palette.surface02, borderLeft: `3px solid ${palette.terracotta}`, borderRadius: themeA.radius, maxWidth: "70ch", marginBottom: 12 }}>
-        <p style={{ fontSize: 16, color: themeA.text, lineHeight: 1.55, margin: "0 0 12px" }}>{dx.headline}</p>
+        <p style={{ fontSize: 16, color: themeA.text, lineHeight: 1.55, margin: "0 0 12px" }}>{headline}</p>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap", fontSize: 12.5, color: themeA.muted, fontFamily: themeA.mono }}>
           {dx.hottestSlot && <span>hottest slot <strong style={{ color: palette.ember }}>{shortSlot(dx.hottestSlot)}</strong>{dx.hottestSlotConflicts != null ? ` · ${fmt(dx.hottestSlotConflicts)}` : ""}</span>}
           {dx.dominantKind && <span>kind <strong style={{ color: palette.terracotta }}>{dx.dominantKind}</strong></span>}
           {dx.topMethod && <span>top method <strong style={{ color: themeA.text }}>{dx.topMethod}</strong></span>}
         </div>
       </div>
-      <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6, maxWidth: "70ch", marginBottom: 24 }}>
-        The slot, kind and method above are measured. What the slot <em>holds</em> is inferred from its
-        shape, it {dx.slotRole}. Confirming the exact variable needs the contract&apos;s source.
-      </p>
+      {va ? (
+        <div style={{ maxWidth: "70ch", marginBottom: 24 }}>
+          <p style={{ fontSize: 14, color: themeA.text, lineHeight: 1.6, margin: "0 0 10px" }}>{va.slotMeaning}</p>
+          <p style={{ fontSize: 14, color: themeA.muted, lineHeight: 1.6, margin: "0 0 10px" }}>{va.mechanism}</p>
+          <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6 }}>{va.confidence}</p>
+        </div>
+      ) : (
+        <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6, maxWidth: "70ch", marginBottom: 24 }}>
+          The slot, kind and method above are measured. What the slot <em>holds</em> is inferred from its
+          shape, it {dx.slotRole}. Confirming the exact variable needs the contract&apos;s source.
+        </p>
+      )}
 
       {/* measured impact → business translation */}
       {dx.recoverable != null && dx.recoverable > 0 && (
@@ -104,23 +122,29 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
         </>
       )}
 
-      {/* the fix, explicitly a candidate, not a verified change */}
+      {/* the fix, verified (source-backed) or candidate (inferred) */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-        <span className="pev-eyebrow">Candidate fix · {dx.fix.title}</span>
-        <span style={{ fontFamily: themeA.mono, fontSize: 11, color: palette.amber, border: `1px solid rgba(212,169,74,0.3)`, borderRadius: themeA.radius, padding: "2px 8px" }}>
-          needs review
-        </span>
+        <span className="pev-eyebrow">{va ? "Fix" : "Candidate fix"} · {fix.title}</span>
+        {va ? (
+          <span style={{ fontFamily: themeA.mono, fontSize: 11, color: palette.ember, border: `1px solid rgba(226,140,82,0.4)`, borderRadius: themeA.radius, padding: "2px 8px" }}>
+            source-backed
+          </span>
+        ) : (
+          <span style={{ fontFamily: themeA.mono, fontSize: 11, color: palette.amber, border: `1px solid rgba(212,169,74,0.3)`, borderRadius: themeA.radius, padding: "2px 8px" }}>
+            needs review
+          </span>
+        )}
       </div>
-      <p style={{ fontSize: 15, color: themeA.muted, lineHeight: 1.7, maxWidth: "64ch", margin: "0 0 16px" }}>{dx.fix.rationale}</p>
+      <p style={{ fontSize: 15, color: themeA.muted, lineHeight: 1.7, maxWidth: "64ch", margin: "0 0 16px" }}>{fix.rationale}</p>
       <FixDiagram />
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))", gap: 14, marginTop: 16 }}>
-        <CodeCard label="Before" tone="warn" code={dx.fix.before} />
-        <CodeCard label="After" tone="good" code={dx.fix.after} />
+        <CodeCard label="Before" tone="warn" code={fix.before} />
+        <CodeCard label="After" tone="good" code={fix.after} />
       </div>
       <p style={{ fontSize: 12, color: themeA.subtle, lineHeight: 1.6, maxWidth: "64ch", marginTop: 12 }}>
-        The diagnosis and this fix direction are measured and free. The exact change depends on what
-        the slot holds, so the precise implementation, mapped to your variables and the verified
-        on-chain contention drop, is the Silk Nodes audit. Your team confirms the slot in seconds.
+        {va
+          ? "This analysis is read from the contract's verified source. The before/after is the standard shard pattern for the measured contention; Silk Nodes does the full implementation and verifies the contention drop on-chain."
+          : "The diagnosis and this fix direction are measured and free. The exact change depends on what the slot holds, so the precise implementation, mapped to your variables and the verified on-chain contention drop, is the Silk Nodes audit. Your team confirms the slot in seconds."}
       </p>
 
       {/* methods + kinds */}

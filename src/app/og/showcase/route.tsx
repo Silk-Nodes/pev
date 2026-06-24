@@ -18,7 +18,7 @@ import { pickVariant } from "@/lib/og/variant";
 
 const WIDTH = 1200;
 const HEIGHT = 630;
-const FEATURED = "0x34b6552d57a35a1d042ccae1951bd1c370112a6f"; // Perpl
+const FEATURED = "0x57cf97fe1fac7d78b07e7e0761410cb2e91f0ca7"; // MarginAccount
 
 export const runtime = "nodejs";
 
@@ -39,7 +39,7 @@ export async function GET(req: Request) {
 
   const audit = got?.audit;
   const cardData: ShowcaseCardData = {
-    subject: audit?.label ?? "Perpl",
+    subject: audit?.label ?? "MarginAccount",
     reexecs: audit?.totals.conflicts ?? 0,
     conflictsPerTx: audit?.totals.conflictRate ?? 0,
     txs: audit?.totals.txs ?? 0,
