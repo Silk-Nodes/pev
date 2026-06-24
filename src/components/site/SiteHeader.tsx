@@ -213,7 +213,12 @@ export default function SiteHeader({
             SearchBox), not by trying to reserve space here, which would
             force the right cluster to wrap to a new row on otherwise-
             fine viewports. */}
-        <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
+        {/* Search slot. minWidth keeps the input usable: when the page is
+            tight (long tagline + wide nav, the contract page especially),
+            the search can't collapse to nothing, so the right-cluster nav
+            wraps to its own row instead of jamming against the orange
+            submit button and clipping the first nav link ("showcase"). */}
+        <div style={{ flex: "1 1 240px", display: "flex", justifyContent: "center", minWidth: 200 }}>
           {showSearch && <SearchBox variant="header" />}
         </div>
 
