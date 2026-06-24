@@ -189,7 +189,11 @@ export default function SiteHeader({
           <Link href="/" style={{ textDecoration: "none" }} aria-label="pev, home">
             <PEVLockup markSize={26} wordSize={26} />
           </Link>
-          {tagline && (
+          {/* Tagline OR search, not both. Pages with the search box (all
+              internal pages) skip the editorial tagline so the masthead
+              stays on ONE line, the breadcrumb below carries the context.
+              Home (no search) keeps its tagline. */}
+          {tagline && !showSearch && (
             <span
               className="pev-eyebrow pev-header-tagline"
               style={{
@@ -213,12 +217,10 @@ export default function SiteHeader({
             SearchBox), not by trying to reserve space here, which would
             force the right cluster to wrap to a new row on otherwise-
             fine viewports. */}
-        {/* Search slot. minWidth keeps the input usable: when the page is
-            tight (long tagline + wide nav, the contract page especially),
-            the search can't collapse to nothing, so the right-cluster nav
-            wraps to its own row instead of jamming against the orange
-            submit button and clipping the first nav link ("showcase"). */}
-        <div style={{ flex: "1 1 240px", display: "flex", justifyContent: "center", minWidth: 200 }}>
+        {/* Search slot. flex:1 + minWidth:0 lets it shrink so the whole
+            masthead stays on one line; with the tagline dropped on search
+            pages there's ample room and the nav no longer crams. */}
+        <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
           {showSearch && <SearchBox variant="header" />}
         </div>
 
