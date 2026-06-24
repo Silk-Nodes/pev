@@ -347,9 +347,9 @@ contracts:
     source: manual
     notes: "conflicts=0 txs=752,431"
   - address: 0x8cf67893c236963233023b56ac56a185b042866f
-    name: "EIP-7702 Account"
+    name: "EIP-7702 Account (PlacerWithCloid)"
     source: manual
-    notes: "conflicts=0 txs=535,100 · 7702-delegated EOA → impl 0xd63aD20884aFA6281969b2BD21A8708Eed546fAC · per-EOA storage, no shared state, fully parallel"
+    notes: "conflicts=0 txs=535,100 · 7702-delegated EOA → impl PlacerWithCloid 0xd63aD20884aFA6281969b2BD21A8708Eed546fAC (verified, solc 0.8.32) · order-placement smart account (cloid = client order id) · per-EOA storage, no shared state, fully parallel"
   - address: 0x98dc6e90d4c2f212ed9d124ad2afba4833268633
     name: "RedStone: priceFeeds"
     source: manual
