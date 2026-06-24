@@ -138,6 +138,10 @@ contracts:
     name: "Kuru Exchange: MarginAccount"
     source: manual
     notes: "conflicts=1,350,629 txs=1,971,569"
+  - address: 0x57cf97fe1fac7d78b07e7e0761410cb2e91f0ca7
+    name: "MarginAccount"
+    source: manual
+    notes: "verified (solc 0.8.30, BUSL-1.1), UUPS upgradeable. Top contention node. balances mapping at slot 1; per-user keys isolated, contention is a shared accumulator entry (structurally the feeCollector via creditFee, written every trade). Distinct deployment from Kuru's 0x2a68."
   - address: 0x8d66a43fa9d0ff4929b9d36437a8371f5d113095
     # TODO: research this address
     name: ""
