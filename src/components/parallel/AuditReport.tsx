@@ -111,9 +111,9 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
               const rel = s.conflicts / maxSlot;
               const size = 60 + Math.round(rel * 60);
               return (
-                <div key={s.slot} title={`${s.slot}\n${fmt(s.conflicts)} collisions · ${fmt(s.touches)} touches`}
+                <div key={s.slot} title={`${s.name ? s.name + "\n" : ""}${s.slot}\n${fmt(s.conflicts)} collisions · ${fmt(s.touches)} touches`}
                   style={{ width: size, height: size, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: `rgba(200,85,61,${0.1 + rel * 0.6})`, border: `1px solid rgba(226,140,82,${0.25 + rel * 0.5})`, borderRadius: themeA.radius, padding: 6, textAlign: "center" }}>
-                  <span style={{ fontFamily: themeA.mono, fontSize: 10, color: themeA.text, opacity: 0.85 }}>{shortSlot(s.slot)}</span>
+                  <span style={{ fontFamily: themeA.mono, fontSize: 10, color: themeA.text, opacity: 0.85, overflow: "hidden", textOverflow: "ellipsis", maxWidth: "100%" }}>{s.name ?? shortSlot(s.slot)}</span>
                   <span style={{ fontFamily: themeA.mono, fontSize: 12, color: palette.bone, fontWeight: 600, marginTop: 4 }}>{fmtCompact(s.conflicts)}</span>
                 </div>
               );
@@ -154,14 +154,20 @@ export function AuditReport({ audit, refreshedAt }: { audit: ContractAudit; refr
             <SubHead>Methods causing conflicts</SubHead>
             {audit.methods.map((m) => (
               <div key={m.selector} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: themeA.mono, marginBottom: 4 }}>
-                  <span style={{ color: themeA.text }}>{m.selector}</span>
-                  <span style={{ color: palette.ember }}>{fmtCompact(m.conflicts)}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontFamily: themeA.mono, marginBottom: 4, gap: 8 }}>
+                  <span style={{ color: themeA.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {m.name ? <>{m.name}<span style={{ color: themeA.subtle }}>()</span></> : m.selector}
+                  </span>
+                  <span style={{ color: palette.ember, flexShrink: 0 }}>{fmtCompact(m.conflicts)}</span>
                 </div>
                 <Bar pct={(m.conflicts / maxMethod) * 100} color={palette.ember} />
               </div>
             ))}
-            <p style={{ fontSize: 11, color: themeA.subtle, marginTop: 8 }}>4-byte selectors. Resolve to names with the contract&apos;s ABI.</p>
+            <p style={{ fontSize: 11, color: themeA.subtle, marginTop: 8 }}>
+              {audit.methods.some((m) => m.name)
+                ? "Names resolved from verified ABI / public signature database (best-effort; selectors are the tx entry method)."
+                : "4-byte function selectors (the transaction's entry method)."}
+            </p>
           </div>
         )}
         {audit.kinds.length > 0 && (

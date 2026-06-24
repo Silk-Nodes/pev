@@ -33,6 +33,13 @@ import { publishBlockIndexed } from "@/lib/api/pubsub";
 // payload. Background-job code path only (the refresh script), never a
 // page request. No circular dep: enrichment does not import store.
 import { resolveManyContracts } from "@/lib/enrichment";
+import {
+  fetchVerifiedMeta,
+  buildSelectorMap,
+  resolveScalarSlot,
+  mappingLabels,
+  fetchSelectorNames,
+} from "@/lib/audit/sourcify";
 
 // ─── helpers ──────────────────────────────────────────────────────
 
@@ -2303,12 +2310,16 @@ export interface AuditHotSlot {
   touches: number;
   /** 0..1, peak normalized contention seen for this slot */
   contention: number;
+  /** resolved variable name from verified storage layout, scalars only */
+  name?: string;
 }
 export interface AuditMethod {
   /** 4-byte selector, 0x-prefixed */
   selector: string;
   txCount: number;
   conflicts: number;
+  /** resolved function name from verified ABI, if available */
+  name?: string;
 }
 export interface AuditKind {
   kind: string; // 'write-write' | 'read-write' | 'mixed'
@@ -2330,6 +2341,10 @@ export interface ContractAudit {
   kinds: AuditKind[];
   /** true if one or more aggregates timed out and were skipped */
   partial: boolean;
+  /** true if we resolved names from the contract's verified ABI/layout */
+  verifiedAbi?: boolean;
+  /** mapping variable names from the verified layout (for hashed slots) */
+  mappings?: string[];
 }
 
 /**
@@ -2472,6 +2487,48 @@ export async function refreshContractAudit(
   const conflictRate =
     txs != null && txs > 0 && conflicts != null ? conflicts / txs : null;
 
+  // Resolve method + slot names from the contract's verified ABI/layout
+  // (BlockVision Sourcify). One off-peak network call; failures degrade
+  // silently to raw selectors. See [[pev-db-contention]] (page never does this).
+  let verifiedAbi = false;
+  let mappings: string[] | undefined;
+  try {
+    // 1. Verified storage layout → scalar slot names + mapping labels. Also
+    //    name the contract's OWN methods (when it's the tx entry point).
+    const meta = await fetchVerifiedMeta(address);
+    if (meta?.abi) {
+      verifiedAbi = true;
+      const selMap = buildSelectorMap(meta.abi);
+      for (const m of methods) {
+        const name = selMap.get(m.selector.toLowerCase());
+        if (name) m.name = name;
+      }
+      if (meta.storageLayout) {
+        for (const s of hotSlots) {
+          const name = resolveScalarSlot(meta.storageLayout, s.slot);
+          if (name) s.name = name;
+        }
+        const maps = mappingLabels(meta.storageLayout);
+        if (maps.length) mappings = maps;
+      }
+    }
+    // 2. Remaining method selectors are tx-entry methods (often from OTHER
+    //    contracts when this one is called internally) → resolve via the
+    //    public signature database.
+    const unresolved = methods.filter((m) => !m.name).map((m) => m.selector);
+    if (unresolved.length) {
+      const names = await fetchSelectorNames(unresolved);
+      for (const m of methods) {
+        if (!m.name) {
+          const n = names.get(m.selector.toLowerCase());
+          if (n) m.name = n;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn(`[audit] name resolve skipped: ${(err as Error).message}`);
+  }
+
   return {
     address,
     label,
@@ -2482,6 +2539,8 @@ export async function refreshContractAudit(
     methods,
     kinds,
     partial,
+    verifiedAbi,
+    mappings,
   };
 }
 

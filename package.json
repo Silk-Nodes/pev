@@ -30,6 +30,7 @@
     "deploy:logs:web": "ssh $PEV_HOST 'journalctl -u pev-web -f'"
   },
   "dependencies": {
+    "js-sha3": "^0.9.3",
     "next": "^15.5.16",
     "pg": "^8.13.0",
     "pg-boss": "^10.1.5",
