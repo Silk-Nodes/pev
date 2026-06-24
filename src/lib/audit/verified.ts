@@ -32,7 +32,7 @@ const ENTRIES: VerifiedAnalysis[] = [
   {
     address: "0x57cf97fe1fac7d78b07e7e0761410cb2e91f0ca7",
     name: "MarginAccount",
-    source: "verified · solc 0.8.30 · UUPS · BUSL-1.1",
+    source: "solc 0.8.30 · UUPS · BUSL-1.1",
     headline:
       "Per-user balances already run in parallel. The contention is a shared accumulator in the balances mapping that nearly every trade writes.",
     slotMeaning:
