@@ -102,9 +102,12 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
         const qx = mx + (CX - mx) * 0.45;
         const qy = my + (CY - my) * 0.45;
         const d = `M${a.x.toFixed(1)} ${a.y.toFixed(1)} Q${qx.toFixed(1)} ${qy.toFixed(1)} ${b.x.toFixed(1)} ${b.y.toFixed(1)}`;
-        // "hot" = meaningful conflict magnitude, not the near-universal
-        // conflicts > 0. Drives the contention-view flow filter + accent.
-        const hot = e.conflicts / maxConflict >= 0.05;
+        // "hot" = meaningfully contended, on a LOG scale so one dominant
+        // pair doesn't make everything else read as zero. Drives the
+        // contention-view flow filter + accent.
+        const hot =
+          maxConflict > 1 &&
+          Math.log(e.conflicts + 1) / Math.log(maxConflict + 1) >= 0.55;
         return {
           d,
           hot,
@@ -408,21 +411,24 @@ export function CooccurrenceGraph({ data }: { data: GraphData }) {
             let stroke: string;
             let width: number;
             if (view === "contention") {
-              // Contention view: rank by conflict MAGNITUDE. Nearly every
-              // pair has conflicts > 0 (a tx with 50 contracts flags all its
-              // pairs when one collides), so a binary highlight is useless,
-              // we scale by conflict_count and hard-fade the low end so only
-              // the genuine hotspots glow.
+              // Contention view: scale by conflict magnitude on a LOG scale.
+              // Linear-vs-max made everything below 5% of the single biggest
+              // pair vanish, so one dominant pair blanked the whole view. Log
+              // keeps mid-tier contended pairs clearly visible; only truly
+              // uncontended pairs fade out.
               stroke = palette.ember;
-              const relX = e.conflicts / layout.maxConflict;
-              if (relX < 0.05) {
-                opacity = 0.02;
+              const relX =
+                e.conflicts > 0 && layout.maxConflict > 1
+                  ? Math.log(e.conflicts + 1) / Math.log(layout.maxConflict + 1)
+                  : 0;
+              if (e.conflicts <= 0) {
+                opacity = 0.03;
                 width = 0.4;
               } else {
-                opacity = 0.35 + 0.6 * relX;
-                width = 0.8 + 5 * Math.sqrt(relX);
+                opacity = 0.2 + 0.7 * relX;
+                width = 0.7 + 4.5 * relX;
               }
-              if (active) opacity = focus ? opacity : 0.01;
+              if (active) opacity = focus ? Math.max(opacity, 0.55) : 0.02;
             } else {
               // Relationship view: neutral composability. Depth by
               // co-occurrence strength; contention lives in the other view.
