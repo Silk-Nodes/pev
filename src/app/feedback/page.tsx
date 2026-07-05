@@ -20,6 +20,7 @@
  * No admin UI; build one when there are enough requests to justify it.
  */
 
+import { jsonLd } from "@/lib/jsonld";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { themeA, palette } from "@/components/parallel/theme";
@@ -75,7 +76,7 @@ export default async function FeedbackPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
+          __html: jsonLd(
             breadcrumbSchema([
               { name: "pev", url: "/" },
               { name: "feedback", url: "/feedback" },

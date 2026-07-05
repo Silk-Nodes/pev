@@ -16,6 +16,7 @@
  * this page and bump the "last updated" date.
  */
 
+import { jsonLd } from "@/lib/jsonld";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { themeA, palette } from "@/components/parallel/theme";
@@ -57,7 +58,7 @@ export default function PrivacyPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
+          __html: jsonLd(
             breadcrumbSchema([
               { name: "pev", url: "/" },
               { name: "privacy", url: "/privacy" },

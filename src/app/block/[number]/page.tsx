@@ -1,3 +1,4 @@
+import { jsonLd } from "@/lib/jsonld";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { probeBlock } from "@/lib/parallel-probe";
@@ -230,7 +231,7 @@ function BreadcrumbScript({
     <script
       type="application/ld+json"
       dangerouslySetInnerHTML={{
-        __html: JSON.stringify(breadcrumbSchema(items)),
+        __html: jsonLd(breadcrumbSchema(items)),
       }}
     />
   );

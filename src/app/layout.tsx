@@ -1,3 +1,4 @@
+import { jsonLd } from "@/lib/jsonld";
 import type { Metadata, Viewport } from "next";
 import { Inter_Tight, Instrument_Serif, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
@@ -151,7 +152,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             page components. See src/lib/seo/schema.ts. */}
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(rootGraph()) }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(rootGraph()) }}
         />
         {children}
         {/* Google Analytics 4, loads for every visitor with anonymize_ip

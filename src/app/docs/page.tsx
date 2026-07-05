@@ -22,6 +22,7 @@
  *   7. About + contact
  */
 
+import { jsonLd } from "@/lib/jsonld";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { themeA, palette } from "@/components/parallel/theme";
@@ -94,7 +95,7 @@ export default function DocsPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
+          __html: jsonLd(
             breadcrumbSchema([
               { name: "pev", url: "/" },
               { name: "docs", url: "/docs" },
@@ -105,7 +106,7 @@ export default function DocsPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(docsWebPageSchema()),
+          __html: jsonLd(docsWebPageSchema()),
         }}
       />
       {/* FAQPage JSON-LD: 8 Q&A pairs drawn from the visible page content
@@ -116,7 +117,7 @@ export default function DocsPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(docsFaqSchema()),
+          __html: jsonLd(docsFaqSchema()),
         }}
       />
 

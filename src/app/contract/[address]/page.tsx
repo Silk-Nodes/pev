@@ -1,3 +1,4 @@
+import { jsonLd } from "@/lib/jsonld";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -362,7 +363,7 @@ export default async function ContractPage({ params, searchParams }: PageParams)
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
+          __html: jsonLd(
             breadcrumbSchema([
               { name: "pev", url: "/" },
               { name: "contract", url: "/" },

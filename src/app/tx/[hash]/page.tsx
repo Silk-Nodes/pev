@@ -1,3 +1,4 @@
+import { jsonLd } from "@/lib/jsonld";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getTxDetail } from "@/lib/indexer/store";
@@ -118,7 +119,7 @@ export default async function TxPage({ params }: PageParams) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(
+          __html: jsonLd(
             breadcrumbSchema([
               { name: "pev", url: "/" },
               { name: "tx", url: "/" },
