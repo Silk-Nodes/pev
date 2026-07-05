@@ -45,7 +45,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/ws": "^8.18.1",
-    "tsx": "^4.19.0",
+    "tsx": "^4.23.0",
     "typescript": "^5.7.0"
   },
   "//browserslist": "Tightens our target browsers to recent versions only, which lets Next.js / SWC skip transpiling modern syntax (optional chaining, nullish coalescing, native async/await, etc.) down to legacy equivalents. Drops ~12 KiB of legacy JS shims from the production bundle per Lighthouse's audit, ~40-80 ms TBT win on mobile. Audience is Monad devs; all evergreen browsers from 2021+ are supported, which covers >99% of dev traffic.",
