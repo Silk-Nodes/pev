@@ -2569,5 +2569,207 @@ export async function getContractAudit(
   return { audit: row.data, refreshedAt: row.refreshed_at };
 }
 
+// ─── per-contract daily rollup (content infrastructure) ─────────
+// contract_stats_daily was declared in 001 but never populated, so every
+// trend query (weekly movers, monthly scorecards) had to aggregate raw
+// block_hot_slots: a multi-minute scan that stresses the shared DB. This
+// fills it incrementally so those reads become instant single-table
+// queries. Same safety shape as the cooccurrence rollup: cursor-based,
+// chunked, statement-timeout bounded, resumable. See [[pev-db-contention]].
+//
+// v1 stores blocks_appeared / conflicts_caused_sum / parallelism_score_avg
+// (everything the movers + leaderboards need). tx_count and top_slots are
+// left at 0 / [] on purpose: tx_count needs a tx_executions unnest that
+// roughly doubles the cost, and slot detail already lives in the audit.
+
+export interface ContractStatsRefreshResult {
+  fromBlock: number;
+  toBlock: number;
+  blocksProcessed: number;
+  chunks: number;
+  rowsWritten: number;
+  caughtUp: boolean;
+}
+
+/** Chunk SQL: aggregate one block range into (contract, day) rows. */
+const STATS_CHUNK_SQL = `
+  WITH src AS MATERIALIZED (
+    SELECT hs.contract,
+           b.timestamp::date        AS day,
+           hs.block_number,
+           hs.conflicts_caused,
+           b.parallelism_score
+      FROM block_hot_slots hs
+      JOIN blocks b ON b.number = hs.block_number
+     WHERE hs.block_number > $1 AND hs.block_number <= $2
+  ),
+  -- dedup to one row per (contract, block) so the score average weights
+  -- each block once, not once per hot slot the contract touched in it.
+  per_block AS (
+    SELECT DISTINCT contract, day, block_number, parallelism_score FROM src
+  ),
+  blocks_agg AS (
+    SELECT contract, day,
+           count(*)::int              AS blocks_appeared,
+           avg(parallelism_score)::real AS score_avg
+      FROM per_block
+     GROUP BY contract, day
+  ),
+  conf_agg AS (
+    SELECT contract, day, sum(conflicts_caused)::bigint AS conflicts
+      FROM src
+     GROUP BY contract, day
+  )
+  INSERT INTO contract_stats_daily
+    (contract, day, tx_count, blocks_appeared, parallelism_score_avg,
+     conflicts_caused_sum, top_slots)
+  SELECT b.contract, b.day, 0, b.blocks_appeared, b.score_avg,
+         c.conflicts, '[]'::jsonb
+    FROM blocks_agg b
+    JOIN conf_agg  c USING (contract, day)
+  ON CONFLICT (contract, day) DO UPDATE SET
+    -- weighted merge FIRST: all SET expressions see the pre-update row,
+    -- so this must reference the old blocks_appeared before it changes.
+    parallelism_score_avg = (
+      (contract_stats_daily.parallelism_score_avg * contract_stats_daily.blocks_appeared
+       + EXCLUDED.parallelism_score_avg * EXCLUDED.blocks_appeared)
+      / NULLIF(contract_stats_daily.blocks_appeared + EXCLUDED.blocks_appeared, 0)
+    )::real,
+    blocks_appeared      = contract_stats_daily.blocks_appeared + EXCLUDED.blocks_appeared,
+    conflicts_caused_sum = contract_stats_daily.conflicts_caused_sum + EXCLUDED.conflicts_caused_sum
+`;
+
+/** Seed/reset the rollup cursor (e.g. to start a bounded backfill). */
+export async function seedContractStatsCursor(block: number): Promise<void> {
+  await query(`UPDATE contract_stats_cursor SET last_block = $1 WHERE id = 1`, [block]);
+}
+
+/** Current rollup cursor + chain head, for reporting. */
+export async function getContractStatsCursor(): Promise<{ cursor: number; head: number }> {
+  const cur = await queryOne<{ last_block: string }>(
+    `SELECT last_block::text FROM contract_stats_cursor WHERE id = 1`,
+  );
+  const tip = await queryOne<{ m: string | null }>(`SELECT max(number)::text AS m FROM blocks`);
+  return {
+    cursor: cur?.last_block ? parseInt(cur.last_block, 10) : 0,
+    head: tip?.m ? parseInt(tip.m, 10) : 0,
+  };
+}
+
+export async function refreshContractStatsDaily(
+  opts: { chunkBlocks?: number; maxChunks?: number; timeoutMs?: number } = {},
+): Promise<ContractStatsRefreshResult> {
+  const chunkBlocks = opts.chunkBlocks ?? 20_000;
+  const maxChunks = opts.maxChunks ?? 10;
+  const timeoutMs = opts.timeoutMs ?? 120_000;
+
+  const { cursor: startFrom, head } = await getContractStatsCursor();
+  let cursor = startFrom;
+  let chunks = 0;
+  let rowsWritten = 0;
+
+  while (cursor < head && chunks < maxChunks) {
+    const to = Math.min(cursor + chunkBlocks, head);
+    const res = await runWithStatementTimeout(timeoutMs, STATS_CHUNK_SQL, [cursor, to]);
+    rowsWritten += res.rowCount ?? 0;
+    // Commit the cursor per chunk so a kill mid-run resumes cleanly.
+    await query(`UPDATE contract_stats_cursor SET last_block = $1 WHERE id = 1`, [to]);
+    cursor = to;
+    chunks += 1;
+  }
+
+  return {
+    fromBlock: startFrom,
+    toBlock: cursor,
+    blocksProcessed: cursor - startFrom,
+    chunks,
+    rowsWritten,
+    caughtUp: cursor >= head,
+  };
+}
+
+// ─── instant trend reads off the rollup ──────────────────────────
+
+export interface ContractMover {
+  address: string;
+  label: string | null;
+  recentConflicts: number;
+  priorConflicts: number;
+  recentCpb: number;
+  priorCpb: number;
+  /** negative = improving (fewer conflicts per block) */
+  pctChange: number;
+}
+
+/**
+ * Week/month movers straight from the rollup. Compares the last
+ * `windowDays` against the `windowDays` before that. Instant: one indexed
+ * read over a small table, no raw-table scan.
+ */
+export async function getContractMovers(
+  windowDays = 7,
+  minCpb = 3,
+  limit = 20,
+): Promise<ContractMover[]> {
+  const rows = await queryRows<{
+    contract: Buffer;
+    recent_c: string;
+    prior_c: string;
+    recent_cpb: string;
+    prior_cpb: string;
+  }>(
+    `WITH recent AS (
+       SELECT contract,
+              sum(conflicts_caused_sum)::bigint AS c,
+              sum(blocks_appeared)::bigint      AS b
+         FROM contract_stats_daily
+        WHERE day > CURRENT_DATE - $1::int
+        GROUP BY contract
+     ),
+     prior AS (
+       SELECT contract,
+              sum(conflicts_caused_sum)::bigint AS c,
+              sum(blocks_appeared)::bigint      AS b
+         FROM contract_stats_daily
+        WHERE day > CURRENT_DATE - ($1::int * 2)
+          AND day <= CURRENT_DATE - $1::int
+        GROUP BY contract
+     )
+     SELECT r.contract,
+            r.c::text                                AS recent_c,
+            p.c::text                                AS prior_c,
+            (r.c::numeric / NULLIF(r.b, 0))::text    AS recent_cpb,
+            (p.c::numeric / NULLIF(p.b, 0))::text    AS prior_cpb
+       FROM recent r
+       JOIN prior  p USING (contract)
+      WHERE r.b > 0 AND p.b > 0
+        AND (p.c::numeric / NULLIF(p.b, 0)) >= $2::numeric
+      ORDER BY ((r.c::numeric / NULLIF(r.b, 0)) - (p.c::numeric / NULLIF(p.b, 0)))
+               / NULLIF(p.c::numeric / NULLIF(p.b, 0), 0) ASC
+      LIMIT $3`,
+    [windowDays, minCpb, limit],
+  );
+
+  const addresses = rows.map((r) => bufferToHex(r.contract));
+  const labels = addresses.length
+    ? await resolveManyContracts(addresses)
+    : new Map<string, string | null>();
+
+  return rows.map((r) => {
+    const address = bufferToHex(r.contract);
+    const recentCpb = parseFloat(r.recent_cpb) || 0;
+    const priorCpb = parseFloat(r.prior_cpb) || 0;
+    return {
+      address,
+      label: labels.get(address) ?? null,
+      recentConflicts: parseInt(r.recent_c, 10),
+      priorConflicts: parseInt(r.prior_c, 10),
+      recentCpb,
+      priorCpb,
+      pctChange: priorCpb > 0 ? ((recentCpb - priorCpb) / priorCpb) * 100 : 0,
+    };
+  });
+}
+
 // Re-export the conflict kind so callers don't need two imports
 export type { ConflictKind, PEVStatus };
