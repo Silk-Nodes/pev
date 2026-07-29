@@ -134,7 +134,21 @@ function Report({
 }: {
   data: GrowthData; refreshedAt: Date; window?: string;
 }) {
-  const all = data.daily;
+  // Drop incomplete edge days. The first indexed day and today are both
+  // partial (pev started mid-day; today is still running), so they render
+  // as artificially short bars and drag the deltas. A day counts as
+  // complete if it has at least 70% of the median day's blocks.
+  const all = (() => {
+    const src = data.daily;
+    if (src.length < 3) return src;
+    const med = [...src.map((x) => x.blocks)].sort((a, b) => a - b)[Math.floor(src.length / 2)];
+    const floor = med * 0.7;
+    let lo = 0;
+    let hi = src.length - 1;
+    if (src[lo].blocks < floor) lo += 1;
+    if (src[hi].blocks < floor) hi -= 1;
+    return src.slice(lo, hi + 1);
+  })();
   // Only offer windows the index can actually fill, no empty tabs.
   const choices = [7, 30, 90, 365].filter((n) => all.length >= n);
   const picked = Number(windowParam);
