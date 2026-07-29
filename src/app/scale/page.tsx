@@ -35,6 +35,14 @@ export const metadata: Metadata = {
       "Throughput, active contracts, and parallelism as Monad grows. From pev's execution traces.",
     type: "website",
     url: "/scale",
+    images: [{ url: "/og/scale", width: 1200, height: 630, alt: "Monad chain growth at the execution layer" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Monad at scale",
+    description:
+      "Throughput, active contracts, and parallelism as Monad grows. From pev's execution traces.",
+    images: ["/og/scale"],
   },
 };
 
