@@ -37,7 +37,12 @@ const compact = (n: number) =>
   : n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
   : n >= 1_000 ? `${Math.round(n / 1000)}K` : `${n}`;
 
-export default async function ScalePage() {
+export default async function ScalePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ w?: string }>;
+}) {
+  const { w } = await searchParams;
   let got: { data: GrowthData; refreshedAt: Date } | null = null;
   try {
     got = await getCachedGrowth();
@@ -87,7 +92,7 @@ export default async function ScalePage() {
           in once the growth refresh has run.
         </div>
       ) : (
-        <Report data={got.data} refreshedAt={got.refreshedAt} />
+        <Report data={got.data} refreshedAt={got.refreshedAt} window={w} />
       )}
 
       <p style={{ marginTop: 32 }}>
@@ -98,20 +103,80 @@ export default async function ScalePage() {
   );
 }
 
-function Report({ data, refreshedAt }: { data: GrowthData; refreshedAt: Date }) {
-  const d = data.daily;
-  const w = data.newContracts;
+/** Split the series into two halves and compare, so every window gets an
+ *  honest "start vs end" delta rather than a fixed 7-day comparison. */
+function halvesDelta(days: GrowthDay[]) {
+  const pct = (a: number, b: number) => (a > 0 ? Math.round(((b - a) / a) * 1000) / 10 : null);
+  if (days.length < 4) return { txsPct: null, scorePct: null, cpbPct: null };
+  const half = Math.floor(days.length / 2);
+  const A = days.slice(0, half);
+  const B = days.slice(-half);
+  const sum = (xs: GrowthDay[], k: "txs" | "blocks" | "conflicts") =>
+    xs.reduce((a, x) => a + x[k], 0);
+  const mean = (xs: GrowthDay[]) => xs.reduce((a, x) => a + x.avgScore, 0) / xs.length;
+  return {
+    txsPct: pct(sum(A, "txs"), sum(B, "txs")),
+    scorePct: pct(mean(A), mean(B)),
+    cpbPct: pct(
+      sum(A, "conflicts") / Math.max(sum(A, "blocks"), 1),
+      sum(B, "conflicts") / Math.max(sum(B, "blocks"), 1),
+    ),
+  };
+}
+
+function Report({
+  data, refreshedAt, window: windowParam,
+}: {
+  data: GrowthData; refreshedAt: Date; window?: string;
+}) {
+  const all = data.daily;
+  // Only offer windows the index can actually fill, no empty tabs.
+  const choices = [7, 30, 90, 365].filter((n) => all.length >= n);
+  const picked = Number(windowParam);
+  const valid = choices.includes(picked);
+  // Default to the full indexed range: the widest honest view.
+  const isAll = !valid;
+  const active = valid ? picked : 0;
+  const d = isAll ? all : all.slice(-picked);
+
+  // Weeks that fall inside the visible day range.
+  const firstDay = d[0]?.day ?? "";
+  const w = data.newContracts.filter((x) => x.week >= firstDay.slice(0, 10));
   const totalNew = w.reduce((a, x) => a + x.newContracts, 0);
+
+  const totals = {
+    blocks: d.reduce((a, x) => a + x.blocks, 0),
+    txs: d.reduce((a, x) => a + x.txs, 0),
+  };
+  const deltas = halvesDelta(d);
+  const label = isAll ? "all time" : `${d.length}-day window`;
 
   return (
     <>
+      {/* window filter */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 20,
+      }}>
+        <span className="pev-eyebrow" style={{ marginRight: 4 }}>Window</span>
+        {choices.map((n) => (
+          <WindowBtn key={n} href={`/scale?w=${n}`} label={`${n}d`} on={!isAll && active === n} />
+        ))}
+        <WindowBtn href="/scale?w=all" label={`all (${all.length}d)`} on={isAll} />
+        {data.history?.firstDay && (
+          <span style={{ fontFamily: themeA.mono, fontSize: 11, color: themeA.subtle, marginLeft: 4 }}>
+            pev has indexed from {data.history.firstDay}
+            {data.history.daysAvailable ? ` · ${data.history.daysAvailable}d of chain history` : ""}
+          </span>
+        )}
+      </div>
+
       {/* headline totals */}
       <section style={{
         display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))",
         gap: 12, marginBottom: 34,
       }}>
-        <Stat big={compact(data.totals.txs)} label="transactions traced" sub={`${data.windowDays}-day window`} />
-        <Stat big={compact(data.totals.blocks)} label="blocks analyzed" sub={`${fmt(data.totals.blocks)} total`} />
+        <Stat big={compact(totals.txs)} label="transactions traced" sub={label} />
+        <Stat big={compact(totals.blocks)} label="blocks analyzed" sub={`${fmt(totals.blocks)} total`} />
         {w.length > 0 && (
           <Stat big={compact(totalNew)} label="contracts newly active" sub="in this window" tone={palette.sage} />
         )}
@@ -126,10 +191,10 @@ function Report({ data, refreshedAt }: { data: GrowthData; refreshedAt: Date }) 
       <Section
         kicker="Throughput"
         title="More transactions, every week"
-        note={data.deltas.txsPct != null
-          ? `${data.deltas.txsPct > 0 ? "+" : ""}${data.deltas.txsPct}% first week vs last`
+        note={deltas.txsPct != null
+          ? `${deltas.txsPct > 0 ? "+" : ""}${deltas.txsPct}% first half vs second`
           : undefined}
-        noteTone={data.deltas.txsPct != null && data.deltas.txsPct > 0 ? palette.sage : themeA.muted}
+        noteTone={deltas.txsPct != null && deltas.txsPct > 0 ? palette.sage : themeA.muted}
       >
         <Bars days={d} pick={(x) => x.txs} color={palette.sage} label="transactions per day" unit="transactions" />
       </Section>
@@ -154,10 +219,10 @@ function Report({ data, refreshedAt }: { data: GrowthData; refreshedAt: Date }) 
       <Section
         kicker="Execution health"
         title="Does the parallelism hold?"
-        note={data.deltas.cpbPct != null
-          ? `conflicts per block ${data.deltas.cpbPct > 0 ? "+" : ""}${data.deltas.cpbPct}%`
+        note={deltas.cpbPct != null
+          ? `conflicts per block ${deltas.cpbPct > 0 ? "+" : ""}${deltas.cpbPct}%`
           : undefined}
-        noteTone={data.deltas.cpbPct != null && data.deltas.cpbPct > 0 ? palette.ember : palette.sage}
+        noteTone={deltas.cpbPct != null && deltas.cpbPct > 0 ? palette.ember : palette.sage}
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
           <div>
@@ -194,7 +259,7 @@ function Report({ data, refreshedAt }: { data: GrowthData; refreshedAt: Date }) 
       </section>
 
       <p style={{ fontSize: 12, color: themeA.subtle, fontFamily: themeA.mono, marginTop: 16 }}>
-        {data.windowDays}-day window · updated {refreshedAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+        {label} · updated {refreshedAt.toISOString().slice(0, 16).replace("T", " ")} UTC
         {data.partial ? " · partial (a heavy aggregate was skipped to protect the indexer)" : ""}
         {" · pev indexes from the block it was started, not chain genesis"}
       </p>
@@ -308,6 +373,25 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+function WindowBtn({ href, label, on }: { href: string; label: string; on: boolean }) {
+  return (
+    <Link
+      href={href}
+      className="pev-link"
+      style={{
+        fontFamily: themeA.mono, fontSize: 11, letterSpacing: "0.05em",
+        textDecoration: "none", padding: "4px 10px", borderRadius: themeA.radius,
+        border: `1px solid ${on ? palette.ember : themeA.border}`,
+        background: on ? "rgba(226,140,82,0.10)" : "transparent",
+        color: on ? palette.ember : themeA.subtle,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {label}
+    </Link>
   );
 }
 

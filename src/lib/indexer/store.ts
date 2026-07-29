@@ -2793,10 +2793,21 @@ export interface GrowthWeek {
   week: string; // YYYY-MM-DD (week start)
   newContracts: number;
 }
+export interface GrowthHistory {
+  /** earliest day pev has indexed (YYYY-MM-DD) */
+  firstDay: string | null;
+  lastDay: string | null;
+  firstBlock: number | null;
+  lastBlock: number | null;
+  /** calendar days of history available */
+  daysAvailable: number | null;
+}
 export interface GrowthData {
   windowDays: number;
   daily: GrowthDay[];
   newContracts: GrowthWeek[];
+  /** how far back pev's index actually goes, so the UI can be honest */
+  history?: GrowthHistory;
   totals: {
     blocks: number;
     txs: number;
@@ -2894,6 +2905,38 @@ export async function refreshGrowthData(
     [],
   );
 
+  // How far back the index actually goes. Both ends come off the PK
+  // btree (ORDER BY number LIMIT 1), so this is instant, never a scan
+  // on `timestamp` (which has no index).
+  const histRow = await guarded<{
+    first_ts: Date | null; last_ts: Date | null;
+    min_b: string | null; max_b: string | null;
+  }>(
+    `SELECT (SELECT timestamp FROM blocks ORDER BY number ASC  LIMIT 1) AS first_ts,
+            (SELECT timestamp FROM blocks ORDER BY number DESC LIMIT 1) AS last_ts,
+            (SELECT min(number)::text FROM blocks) AS min_b,
+            (SELECT max(number)::text FROM blocks) AS max_b`,
+    [],
+  );
+  const h = histRow[0];
+  const iso = (d: Date | null | undefined) =>
+    d ? new Date(d).toISOString().slice(0, 10) : null;
+  const history: GrowthHistory = {
+    firstDay: iso(h?.first_ts),
+    lastDay: iso(h?.last_ts),
+    firstBlock: h?.min_b ? parseInt(h.min_b, 10) : null,
+    lastBlock: h?.max_b ? parseInt(h.max_b, 10) : null,
+    daysAvailable:
+      h?.first_ts && h?.last_ts
+        ? Math.max(
+            1,
+            Math.round(
+              (new Date(h.last_ts).getTime() - new Date(h.first_ts).getTime()) / 86_400_000,
+            ),
+          )
+        : null,
+  };
+
   // Deltas: first vs last COMPLETE 7-day block inside the window.
   const complete = daily.slice(0, Math.floor(daily.length / 7) * 7);
   const pct = (a: number, b: number) => (a > 0 ? Math.round(((b - a) / a) * 1000) / 10 : null);
@@ -2917,6 +2960,7 @@ export async function refreshGrowthData(
     windowDays,
     daily,
     newContracts,
+    history,
     totals: {
       blocks: daily.reduce((a, d) => a + d.blocks, 0),
       txs: daily.reduce((a, d) => a + d.txs, 0),
