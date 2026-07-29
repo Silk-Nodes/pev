@@ -319,6 +319,22 @@ function Report({
         </Section>
       )}
 
+      {/* Tell the operator why a section is missing instead of hiding it
+          silently: an older cached payload predates these fields. */}
+      {(data.waves === undefined || data.concentration === undefined) && (
+        <p style={{
+          fontFamily: themeA.mono, fontSize: 12, color: themeA.subtle,
+          marginTop: 32, padding: "10px 12px", maxWidth: "70ch",
+          border: `1px dashed ${themeA.border}`, borderRadius: themeA.radius,
+        }}>
+          Some sections are hidden: this cached payload predates them. Re-run{" "}
+          <span style={{ color: themeA.text }}>npm run growth</span> to populate
+          {data.waves === undefined ? " wave distribution" : ""}
+          {data.waves === undefined && data.concentration === undefined ? " and" : ""}
+          {data.concentration === undefined ? " contention concentration" : ""}.
+        </p>
+      )}
+
       {/* CTA */}
       <section style={{
         marginTop: 44, padding: "26px clamp(20px, 4vw, 40px)",
