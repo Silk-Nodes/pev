@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { getCachedGrowth, type GrowthData, type GrowthDay } from "@/lib/indexer/store";
+import {
+  getCachedGrowth,
+  type GrowthData,
+  type GrowthDay,
+  type MonadRelease,
+} from "@/lib/indexer/store";
 import { themeA, palette } from "@/components/parallel/theme";
 import SiteHeader, { Crumb, CrumbSep } from "@/components/site/SiteHeader";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -148,6 +153,9 @@ function Report({
     blocks: d.reduce((a, x) => a + x.blocks, 0),
     txs: d.reduce((a, x) => a + x.txs, 0),
   };
+  // Releases inside the visible range, for timeline markers.
+  const lastDay = d[d.length - 1]?.day ?? "";
+  const rel = (data.releases ?? []).filter((r) => r.day >= firstDay && r.day <= lastDay);
   const deltas = halvesDelta(d);
   const label = isAll ? "all time" : `${d.length}-day window`;
 
@@ -196,7 +204,7 @@ function Report({
           : undefined}
         noteTone={deltas.txsPct != null && deltas.txsPct > 0 ? palette.sage : themeA.muted}
       >
-        <Bars days={d} pick={(x) => x.txs} color={palette.sage} label="transactions per day" unit="transactions" />
+        <Bars days={d} pick={(x) => x.txs} color={palette.sage} label="transactions per day" unit="transactions" releases={rel} />
       </Section>
 
       {/* 2 · working surface */}
@@ -226,10 +234,10 @@ function Report({
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
           <div>
-            <Bars days={d} pick={(x) => x.avgScore} color={palette.bone} label="parallelism score (0-100)" max={100} unit="/100 parallelism score" />
+            <Bars days={d} pick={(x) => x.avgScore} color={palette.bone} label="parallelism score (0-100)" max={100} unit="/100 parallelism score" releases={rel} />
           </div>
           <div>
-            <Bars days={d} pick={(x) => x.cpb} color={palette.ember} label="conflicts per block" unit="conflicts per block" />
+            <Bars days={d} pick={(x) => x.cpb} color={palette.ember} label="conflicts per block" unit="conflicts per block" releases={rel} />
           </div>
         </div>
         <p style={{ fontSize: 14, color: themeA.muted, lineHeight: 1.7, marginTop: 14, maxWidth: "64ch" }}>
@@ -237,6 +245,14 @@ function Report({
           duplicate work: every conflict is a transaction Monad executed, threw away, and ran
           again. Watching the two together is the only way to tell real scaling from busywork.
         </p>
+        {rel.length > 0 && (
+          <p style={{ fontSize: 12.5, color: themeA.subtle, lineHeight: 1.7, marginTop: 12, maxWidth: "64ch" }}>
+            <span style={{ color: palette.sage }}>Dashed lines</span> mark Monad node releases in
+            this window. They are GitHub publish dates, not mainnet activation, and chain-wide
+            numbers move with what dapps do as much as with the client. Read them as context for
+            correlation, not as cause.
+          </p>
+        )}
       </Section>
 
       {/* CTA */}
@@ -270,13 +286,14 @@ function Report({
 /* ── charts (server-rendered SVG, no client JS) ── */
 
 function Bars({
-  days, pick, color, label, max, unit,
+  days, pick, color, label, max, unit, releases,
 }: {
   days: GrowthDay[]; pick: (d: GrowthDay) => number; color: string;
-  label: string; max?: number; unit?: string;
+  label: string; max?: number; unit?: string; releases?: MonadRelease[];
 }) {
   const vals = days.map(pick);
   const hi = max ?? Math.max(...vals, 1);
+  const relByDay = new Map((releases ?? []).map((r) => [r.day, r.tag]));
   return (
     <div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 150 }}>
@@ -293,9 +310,15 @@ function Bars({
                   opacity: 0.55 + 0.45 * (i / Math.max(days.length - 1, 1)),
                 }}
               />
+              {relByDay.has(d.day) && (
+                <span className="pev-col-mark" aria-hidden="true">
+                  <em>{relByDay.get(d.day)}</em>
+                </span>
+              )}
               <span className="pev-col-tip">
                 <b>{fmt(Math.round(v * 100) / 100)}</b>{unit ? ` ${unit}` : ""}
                 <i>{d.day}</i>
+                {relByDay.has(d.day) && <i>Monad {relByDay.get(d.day)} released</i>}
                 <i>{fmt(d.txs)} txs · {fmt(d.blocks)} blocks</i>
                 <i>score {d.avgScore} · {d.cpb} conflicts/block</i>
               </span>

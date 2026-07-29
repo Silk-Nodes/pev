@@ -379,6 +379,32 @@ body {
 .pev-col:first-child:hover .pev-col-tip { transform: translateX(0) translateY(0); }
 .pev-col:last-child .pev-col-tip { left: auto; right: 0; transform: translateX(0) translateY(4px); }
 .pev-col:last-child:hover .pev-col-tip { transform: translateX(0) translateY(0); }
+/* Monad release marker on a chart column: a dashed rule through the
+   chart with a small version label. Correlation only, never a claim. */
+.pev-col-mark {
+  position: absolute;
+  top: -6px;
+  bottom: 0;
+  left: 50%;
+  width: 0;
+  border-left: 1px dashed rgba(168, 196, 135, 0.55);
+  pointer-events: none;
+  z-index: 2;
+}
+.pev-col-mark em {
+  position: absolute;
+  top: -13px;
+  left: 3px;
+  font-family: var(--font-pev-mono), "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 0.04em;
+  color: #a8c487;
+  white-space: nowrap;
+}
+.pev-col:last-child .pev-col-mark em,
+.pev-col:nth-last-child(2) .pev-col-mark em { left: auto; right: 3px; }
+
 .pev-col-tip b { color: #e28c52; font-weight: 600; }
 .pev-col-tip i { display: block; font-style: normal; color: #8a8577; font-size: 10px; }
 @media (prefers-reduced-motion: reduce) {

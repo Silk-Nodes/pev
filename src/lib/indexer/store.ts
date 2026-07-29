@@ -2793,6 +2793,53 @@ export interface GrowthWeek {
   week: string; // YYYY-MM-DD (week start)
   newContracts: number;
 }
+export interface MonadRelease {
+  tag: string;
+  /** YYYY-MM-DD the release was PUBLISHED (not necessarily activated) */
+  day: string;
+}
+
+/**
+ * Monad node releases, for marking the growth timeline. Fetched from the
+ * public GitHub releases API during the precompute (never on a page
+ * request) so the markers stay current without a hardcoded list.
+ *
+ * Honesty: these are publish dates. A release being cut is not the same
+ * as validators upgrading or a feature activating on mainnet, so the UI
+ * labels them "released", and we only ever show correlation.
+ */
+async function fetchMonadReleases(): Promise<MonadRelease[]> {
+  try {
+    const res = await fetch(
+      "https://api.github.com/repos/category-labs/monad/releases?per_page=100",
+      {
+        headers: { accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      tag_name?: string; published_at?: string; prerelease?: boolean; draft?: boolean;
+    }[];
+    const byDay = new Map<string, string>();
+    for (const r of json) {
+      if (!r.tag_name || !r.published_at || r.prerelease || r.draft) continue;
+      if (/-(rc|alpha|beta)/i.test(r.tag_name)) continue;
+      const day = r.published_at.slice(0, 10);
+      // Same-day releases (e.g. v0.15.1 + v0.15.2) collapse to the latest.
+      const prev = byDay.get(day);
+      if (!prev || r.tag_name.localeCompare(prev, undefined, { numeric: true }) > 0) {
+        byDay.set(day, r.tag_name);
+      }
+    }
+    return [...byDay.entries()]
+      .map(([day, tag]) => ({ day, tag }))
+      .sort((a, b) => a.day.localeCompare(b.day));
+  } catch {
+    return [];
+  }
+}
+
 export interface GrowthHistory {
   /** earliest day pev has indexed (YYYY-MM-DD) */
   firstDay: string | null;
@@ -2808,6 +2855,8 @@ export interface GrowthData {
   newContracts: GrowthWeek[];
   /** how far back pev's index actually goes, so the UI can be honest */
   history?: GrowthHistory;
+  /** Monad node releases, for marking the timeline (correlation only) */
+  releases?: MonadRelease[];
   totals: {
     blocks: number;
     txs: number;
@@ -2956,11 +3005,14 @@ export async function refreshGrowthData(
     cpbPct = pct(cpbA, cpbB);
   }
 
+  const releases = await fetchMonadReleases();
+
   return {
     windowDays,
     daily,
     newContracts,
     history,
+    releases,
     totals: {
       blocks: daily.reduce((a, d) => a + d.blocks, 0),
       txs: daily.reduce((a, d) => a + d.txs, 0),
