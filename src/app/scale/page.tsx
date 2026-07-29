@@ -314,15 +314,18 @@ function Report({
               {data.concentration.pct}%
             </span>
             <span style={{ fontSize: 15, color: themeA.text, lineHeight: 1.6, maxWidth: "46ch" }}>
-              of every storage conflict on Monad traces back to just these ten slots.
-              Contention isn&apos;t spread across the chain, it concentrates.
+              of all slot-level contention on Monad concentrates in these ten storage slots.
+              Contention isn&apos;t spread across the chain, it pools.
             </span>
           </div>
           <SlotTable c={data.concentration} />
           <p style={{ fontSize: 12.5, color: themeA.subtle, lineHeight: 1.7, marginTop: 14, maxWidth: "66ch" }}>
-            Measured share of conflicts, not a projection. We deliberately don&apos;t claim what the
-            parallelism score would become if these were fixed: the score is derived from wave
-            depth, and how removing a conflict collapses a wave depends on the rest of the block.
+            Share of slot-attributed conflicts, measured, not projected. A single conflict can
+            involve more than one slot, so this is each slot&apos;s share of all slot-level
+            contention rather than of the block conflict count. We deliberately don&apos;t claim
+            what the parallelism score would become if these were fixed: the score derives from
+            wave depth, and how removing a conflict collapses a wave depends on the rest of the
+            block.
           </p>
         </Section>
       )}

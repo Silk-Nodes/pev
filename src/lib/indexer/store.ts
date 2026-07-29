@@ -3075,17 +3075,25 @@ export async function refreshGrowthData(
   // and says so in the payload. Chain-wide over 90 days would be brutal.
   const concWindowDays = Math.min(windowDays, opts.concentrationDays ?? 7);
   const concFrom = Math.max(0, head - blocksPerDay * concWindowDays);
-  const slotRows = await guarded<{ contract: Buffer; slot: Buffer; conflicts: string }>(
-    `SELECT contract, slot, sum(conflicts_caused)::text AS conflicts
-       FROM block_hot_slots
-      WHERE block_number > $1
-      GROUP BY contract, slot
-      ORDER BY sum(conflicts_caused) DESC
+  // One scan gives both the top slots AND the correct denominator. The
+  // total MUST also come from block_hot_slots: a single conflict can list
+  // several shared slots, so slot-attributed sums double-count against
+  // blocks.conflict_count and the share would exceed 100%.
+  const slotRows = await guarded<{
+    contract: Buffer; slot: Buffer; conflicts: string; total: string;
+  }>(
+    `WITH per_slot AS (
+       SELECT contract, slot, sum(conflicts_caused) AS c
+         FROM block_hot_slots
+        WHERE block_number > $1
+        GROUP BY contract, slot
+     )
+     SELECT contract, slot,
+            c::text                          AS conflicts,
+            (SELECT sum(c) FROM per_slot)::text AS total
+       FROM per_slot
+      ORDER BY c DESC
       LIMIT 10`,
-    [concFrom],
-  );
-  const totalRow = await guarded<{ n: string | null }>(
-    `SELECT sum(conflict_count)::text AS n FROM blocks WHERE number > $1`,
     [concFrom],
   );
   let concentration: SlotConcentration | null = null;
@@ -3102,13 +3110,16 @@ export async function refreshGrowthData(
       };
     });
     const topConflicts = topSlots.reduce((a, x) => a + x.conflicts, 0);
-    const totalConflicts = totalRow[0]?.n ? parseInt(totalRow[0].n, 10) : 0;
+    const totalConflicts = slotRows[0]?.total ? parseInt(slotRows[0].total, 10) : 0;
     concentration = {
       windowDays: concWindowDays,
       topSlots,
       topConflicts,
       totalConflicts,
-      pct: totalConflicts > 0 ? Math.round((topConflicts / totalConflicts) * 1000) / 10 : 0,
+      pct:
+        totalConflicts > 0
+          ? Math.min(100, Math.round((topConflicts / totalConflicts) * 1000) / 10)
+          : 0,
     };
   }
 
