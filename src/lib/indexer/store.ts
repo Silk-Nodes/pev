@@ -2826,6 +2826,12 @@ export interface SlotConcentration {
 }
 export interface GrowthWeek {
   week: string; // YYYY-MM-DD (week start)
+  /**
+   * Addresses first seen executing that week. NOTE: tx_executions.contracts
+   * is every account in the prestate trace, which includes EOAs (senders,
+   * value recipients, the fee recipient), not only contracts. Label this as
+   * addresses / active surface in any UI, never as a contract count.
+   */
   newContracts: number;
 }
 export interface MonadRelease {
@@ -2900,7 +2906,7 @@ export interface GrowthData {
     blocks: number;
     txs: number;
     conflicts: number;
-    /** distinct contracts pev has ever seen active */
+    /** distinct ADDRESSES pev has ever seen executing (includes EOAs) */
     contractsTracked: number | null;
   };
   /** first vs last complete week, for the "growth" callouts */
@@ -2980,8 +2986,10 @@ export async function refreshGrowthData(
     };
   });
 
-  // 2: contracts that first became ACTIVE in each week. Note this is
-  // "first seen executing", not "deployed", a better signal anyway.
+  // 2: addresses that first became ACTIVE in each week. This is "first
+  // seen executing", not "deployed". It counts every address a tx touches
+  // (EOAs included), so it measures the chain's active surface, not a
+  // contract-deployment count.
   const weekRows = await guarded<{ week: string; n: string }>(
     `SELECT to_char(date_trunc('week', b.timestamp), 'YYYY-MM-DD') AS week,
             count(*)::text AS n

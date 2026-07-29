@@ -168,10 +168,7 @@ function Report({
   const active = valid ? picked : 0;
   const d = isAll ? all : all.slice(-picked);
 
-  // Weeks that fall inside the visible day range.
   const firstDay = d[0]?.day ?? "";
-  const w = data.newContracts.filter((x) => x.week >= firstDay.slice(0, 10));
-  const totalNew = w.reduce((a, x) => a + x.newContracts, 0);
 
   const totals = {
     blocks: d.reduce((a, x) => a + x.blocks, 0),
@@ -209,13 +206,10 @@ function Report({
       }}>
         <Stat big={compact(totals.txs)} label="transactions traced" sub={label} />
         <Stat big={compact(totals.blocks)} label="blocks analyzed" sub={`${fmt(totals.blocks)} total`} />
-        {w.length > 0 && (
-          <Stat big={compact(totalNew)} label="contracts newly active" sub="in this window" tone={palette.sage} />
-        )}
         <Stat
           big={data.totals.contractsTracked != null ? compact(data.totals.contractsTracked) : "—"}
-          label="contracts tracked"
-          sub="ever seen executing"
+          label="addresses tracked"
+          sub="in pev's index"
         />
       </section>
 
@@ -230,22 +224,6 @@ function Report({
       >
         <Bars days={d} pick={(x) => x.txs} color={palette.sage} label="transactions per day" unit="transactions" releases={rel} />
       </Section>
-
-      {/* 2 · working surface */}
-      {w.length > 0 && (
-        <Section
-          kicker="Working surface"
-          title="More contracts actually running"
-          note={`${fmt(totalNew)} became active`}
-          noteTone={palette.sage}
-        >
-          <WeekBars weeks={w} />
-          <p style={{ fontSize: 13, color: themeA.subtle, lineHeight: 1.6, marginTop: 12, maxWidth: "62ch" }}>
-            Counted the first time a contract actually executes, not when it&apos;s deployed. A
-            deployed contract nobody calls doesn&apos;t add anything to the chain.
-          </p>
-        </Section>
-      )}
 
       {/* 3 · execution health */}
       <Section
@@ -458,44 +436,6 @@ function Bars({
         <span>{days[0]?.day} → {days[days.length - 1]?.day}</span>
       </div>
     </div>
-  );
-}
-
-function WeekBars({ weeks }: { weeks: { week: string; newContracts: number }[] }) {
-  const hi = Math.max(...weeks.map((w) => w.newContracts), 1);
-  return (
-    <>
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
-        {weeks.map((w) => (
-          <div key={w.week} className="pev-col">
-            <div
-              className="pev-col-bar"
-              style={{
-                height: `${Math.max((w.newContracts / hi) * 100, 2)}%`,
-                background: palette.sage, opacity: 0.85,
-              }}
-            />
-            <span className="pev-col-tip">
-              <b>{fmt(w.newContracts)}</b> contracts
-              <i>week of {w.week}</i>
-              <i>first seen executing</i>
-            </span>
-          </div>
-        ))}
-      </div>
-      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-        {weeks.map((w) => (
-          <div key={w.week} style={{ flex: 1, textAlign: "center" }}>
-            <div style={{ fontFamily: themeA.mono, fontSize: 12, color: themeA.text }}>
-              {compact(w.newContracts)}
-            </div>
-            <div style={{ fontFamily: themeA.mono, fontSize: 10, color: themeA.subtle, marginTop: 2 }}>
-              {w.week.slice(5)}
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
   );
 }
 
