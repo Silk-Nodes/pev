@@ -123,12 +123,12 @@ async function writeBlocksRow(
        number, hash, timestamp, tx_count, stateful_count,
        parallelism_factor, parallelism_score, execution_depth,
        conflict_count, blocked_pct, avg_conflicts_per_tx, hot_slot_count,
-       probe_data, engine_version, trace_ms
+       probe_data, engine_version, trace_ms, gas_used, gas_limit
      ) VALUES (
        $1, $2, to_timestamp($3), $4, $5,
        $6, $7, $8,
        $9, $10, $11, $12,
-       $13, $14, $15
+       $13, $14, $15, $16, $17
      )
      ON CONFLICT (number) DO UPDATE SET
        hash                 = EXCLUDED.hash,
@@ -145,7 +145,9 @@ async function writeBlocksRow(
        probe_data           = EXCLUDED.probe_data,
        engine_version       = EXCLUDED.engine_version,
        indexed_at           = NOW(),
-       trace_ms             = EXCLUDED.trace_ms`,
+       trace_ms             = EXCLUDED.trace_ms,
+       gas_used             = EXCLUDED.gas_used,
+       gas_limit            = EXCLUDED.gas_limit`,
     [
       probe.blockNumber,
       hexToBuffer(probe.blockHash),
@@ -169,6 +171,8 @@ async function writeBlocksRow(
       null,
       engineVersion,
       probe.timing.totalMs,
+      probe.gasUsed,
+      probe.gasLimit,
     ],
   );
 }
@@ -2790,6 +2794,10 @@ export interface GrowthDay {
   cpb: number;
   /** avg execution_depth: the wave count the score is actually derived from */
   avgWaves: number;
+  /** gas consumed that day (0 for blocks indexed before gas capture) */
+  gasUsed: number;
+  /** block gas ceiling summed over the day */
+  gasLimit: number;
 }
 
 /** Blocks bucketed by how many execution waves they needed. */
@@ -2939,13 +2947,17 @@ export async function refreshGrowthData(
     avg_score: string;
     avg_waves: string;
     conflicts: string;
+    gas_used: string;
+    gas_limit: string;
   }>(
     `SELECT to_char(date_trunc('day', timestamp), 'YYYY-MM-DD') AS day,
             count(*)::text              AS blocks,
             sum(tx_count)::text         AS txs,
             avg(parallelism_score)::text AS avg_score,
             avg(execution_depth)::text  AS avg_waves,
-            sum(conflict_count)::text   AS conflicts
+            sum(conflict_count)::text   AS conflicts,
+            sum(gas_used)::text         AS gas_used,
+            sum(gas_limit)::text        AS gas_limit
        FROM blocks
       WHERE number > $1
       GROUP BY 1
@@ -2963,6 +2975,8 @@ export async function refreshGrowthData(
       conflicts,
       cpb: blocks > 0 ? Math.round((conflicts / blocks) * 100) / 100 : 0,
       avgWaves: Math.round(parseFloat(r.avg_waves) * 100) / 100,
+      gasUsed: parseInt(r.gas_used ?? "0", 10) || 0,
+      gasLimit: parseInt(r.gas_limit ?? "0", 10) || 0,
     };
   });
 

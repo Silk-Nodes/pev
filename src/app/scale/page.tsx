@@ -327,6 +327,38 @@ function Report({
         </Section>
       )}
 
+      {/* 6 · block capacity, only once gas has actually accrued */}
+      {d.some((x) => x.gasUsed > 0) && (() => {
+        const g = d.filter((x) => x.gasUsed > 0 && x.gasLimit > 0);
+        const used = g.reduce((a, x) => a + x.gasUsed, 0);
+        const cap = g.reduce((a, x) => a + x.gasLimit, 0);
+        const util = cap > 0 ? (used / cap) * 100 : 0;
+        return (
+          <Section
+            kicker="Block capacity"
+            title="How full are Monad's blocks?"
+            note={`${g.length}d with gas data`}
+          >
+            <div style={{ display: "flex", gap: 18, alignItems: "baseline", flexWrap: "wrap", marginBottom: 16 }}>
+              <span style={{ fontSize: 46, fontWeight: 600, color: themeA.text, letterSpacing: "-0.02em", lineHeight: 1 }}>
+                {util.toFixed(1)}%
+              </span>
+              <span style={{ fontSize: 15, color: themeA.muted, lineHeight: 1.6, maxWidth: "48ch" }}>
+                of the available block gas is being used. Headroom is what a chain has left before
+                contention starts costing real throughput.
+              </span>
+            </div>
+            <Bars days={g} pick={(x) => (x.gasLimit > 0 ? (x.gasUsed / x.gasLimit) * 100 : 0)}
+              color={palette.bone} label="block gas used, % of limit" max={100} unit="% of gas limit" releases={rel} />
+            <p style={{ fontSize: 12.5, color: themeA.subtle, lineHeight: 1.7, marginTop: 12, maxWidth: "66ch" }}>
+              Gas capture started when this column was added, so this series begins later than the
+              rest of the page. Re-executed transactions are absorbed by the chain, not billed to
+              users, so this is a capacity measure, not a fee one.
+            </p>
+          </Section>
+        );
+      })()}
+
       {/* Tell the operator why a section is missing instead of hiding it
           silently: an older cached payload predates these fields. */}
       {(data.waves === undefined || data.concentration === undefined) && (
