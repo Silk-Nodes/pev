@@ -5,6 +5,8 @@ import {
   type GrowthData,
   type GrowthDay,
   type MonadRelease,
+  type WaveBucket,
+  type SlotConcentration,
 } from "@/lib/indexer/store";
 import { themeA, palette } from "@/components/parallel/theme";
 import SiteHeader, { Crumb, CrumbSep } from "@/components/site/SiteHeader";
@@ -269,6 +271,54 @@ function Report({
         )}
       </Section>
 
+      {/* 4 · wave distribution, the mechanism behind the score */}
+      {(data.waves?.length ?? 0) > 0 && (
+        <Section
+          kicker="Parallel execution"
+          title="How many waves does a block need?"
+          note={`avg ${(d.reduce((a, x) => a + x.avgWaves, 0) / Math.max(d.length, 1)).toFixed(2)} waves`}
+        >
+          <p style={{ fontSize: 14, color: themeA.muted, lineHeight: 1.7, maxWidth: "64ch", margin: "0 0 18px" }}>
+            Monad executes a block in waves: everything that can run together runs together, then
+            whatever was blocked runs next. One wave means perfect parallelism. This is what the
+            score is actually made of, it&apos;s{" "}
+            <span style={{ fontFamily: themeA.mono, fontSize: 13, color: themeA.text }}>
+              100 × (1 − waves / stateful txs)
+            </span>
+            , so wave depth <em>is</em> the parallelism.
+          </p>
+          <WaveHistogram waves={data.waves!} />
+          <div style={{ marginTop: 22 }}>
+            <Bars days={d} pick={(x) => x.avgWaves} color={palette.amber} label="average waves per block" releases={rel} />
+          </div>
+        </Section>
+      )}
+
+      {/* 5 · contention concentration */}
+      {data.concentration && data.concentration.topSlots.length > 0 && (
+        <Section
+          kicker="Where the contention lives"
+          title="Ten storage slots, most of the problem"
+          note={`${data.concentration.windowDays}d sample`}
+        >
+          <div style={{ display: "flex", gap: 18, alignItems: "baseline", flexWrap: "wrap", marginBottom: 18 }}>
+            <span style={{ fontSize: 52, fontWeight: 600, color: palette.ember, letterSpacing: "-0.02em", lineHeight: 1 }}>
+              {data.concentration.pct}%
+            </span>
+            <span style={{ fontSize: 15, color: themeA.text, lineHeight: 1.6, maxWidth: "46ch" }}>
+              of every storage conflict on Monad traces back to just these ten slots.
+              Contention isn&apos;t spread across the chain, it concentrates.
+            </span>
+          </div>
+          <SlotTable c={data.concentration} />
+          <p style={{ fontSize: 12.5, color: themeA.subtle, lineHeight: 1.7, marginTop: 14, maxWidth: "66ch" }}>
+            Measured share of conflicts, not a projection. We deliberately don&apos;t claim what the
+            parallelism score would become if these were fixed: the score is derived from wave
+            depth, and how removing a conflict collapses a wave depends on the rest of the block.
+          </p>
+        </Section>
+      )}
+
       {/* CTA */}
       <section style={{
         marginTop: 44, padding: "26px clamp(20px, 4vw, 40px)",
@@ -410,6 +460,66 @@ function Section({
       </div>
       {children}
     </section>
+  );
+}
+
+function WaveHistogram({ waves }: { waves: WaveBucket[] }) {
+  const total = waves.reduce((a, w) => a + w.blocks, 0) || 1;
+  const top = waves.slice(0, 12);
+  const hi = Math.max(...top.map((w) => w.blocks), 1);
+  return (
+    <div>
+      {top.map((w) => {
+        const pct = (w.blocks / total) * 100;
+        return (
+          <div key={w.waves} style={{ display: "grid", gridTemplateColumns: "5.5rem 1fr 5rem", alignItems: "center", gap: 12, marginBottom: 7 }}>
+            <span style={{ fontFamily: themeA.mono, fontSize: 12, color: w.waves === 1 ? palette.sage : themeA.muted }}>
+              {w.waves} wave{w.waves === 1 ? "" : "s"}
+            </span>
+            <span style={{ height: 13, background: "rgba(239,231,212,0.05)", borderRadius: 2, overflow: "hidden", display: "block" }}>
+              <span style={{
+                display: "block", height: "100%", width: `${Math.max((w.blocks / hi) * 100, 0.6)}%`,
+                background: w.waves === 1 ? palette.sage : w.waves <= 3 ? palette.bone : palette.ember,
+                opacity: 0.85,
+              }} />
+            </span>
+            <span style={{ fontFamily: themeA.mono, fontSize: 12, color: themeA.subtle, textAlign: "right" }}>
+              {pct >= 0.1 ? `${pct.toFixed(1)}%` : "<0.1%"}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SlotTable({ c }: { c: SlotConcentration }) {
+  const hi = Math.max(...c.topSlots.map((s) => s.conflicts), 1);
+  return (
+    <div>
+      {c.topSlots.map((s, i) => (
+        <div key={`${s.contract}-${s.slot}`} style={{
+          display: "grid", gridTemplateColumns: "1.6rem minmax(0,1fr) 1.1fr 5.5rem",
+          alignItems: "center", gap: 12, padding: "7px 0",
+          borderBottom: `1px solid ${themeA.border}`,
+        }}>
+          <span style={{ fontFamily: themeA.mono, fontSize: 11, color: themeA.subtle }}>{i + 1}</span>
+          <Link href={`/contract/${s.contract}`} className="pev-link" style={{
+            fontSize: 13.5, color: s.label ? palette.ember : themeA.text,
+            textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {s.label ?? `${s.contract.slice(0, 10)}…${s.contract.slice(-4)}`}
+          </Link>
+          <span style={{ fontFamily: themeA.mono, fontSize: 11, color: themeA.subtle, overflow: "hidden", textOverflow: "ellipsis" }}>
+            slot {s.slot.slice(0, 10)}…
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+            <span style={{ height: 8, width: `${Math.max((s.conflicts / hi) * 46, 3)}px`, background: palette.ember, opacity: 0.8, borderRadius: 2 }} />
+            <span style={{ fontFamily: themeA.mono, fontSize: 12, color: themeA.text }}>{compact(s.conflicts)}</span>
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 

@@ -30,10 +30,16 @@ function intArg(name: string, dflt: number): number {
 async function main(): Promise<number> {
   const windowDays = intArg("days", 30);
   const timeoutMs = intArg("timeout", 60_000);
+  // The slot-concentration query scans block_hot_slots chain-wide, by far
+  // the heaviest part. Keep its window short and independent of --days.
+  const concentrationDays = intArg("concentration-days", 3);
 
-  console.log(`[growth] building · window=${windowDays}d · per-query timeout=${timeoutMs}ms`);
+  console.log(
+    `[growth] building · window=${windowDays}d · concentration=${concentrationDays}d · ` +
+      `per-query timeout=${timeoutMs}ms`,
+  );
   const started = Date.now();
-  const data = await refreshGrowthData({ windowDays, timeoutMs });
+  const data = await refreshGrowthData({ windowDays, timeoutMs, concentrationDays });
   const ms = Date.now() - started;
 
   if (data.daily.length === 0) {
@@ -48,6 +54,12 @@ async function main(): Promise<number> {
       `${data.totals.txs.toLocaleString()} txs · ` +
       `${(data.totals.contractsTracked ?? 0).toLocaleString()} contracts tracked` +
       (data.partial ? " · PARTIAL (a query was skipped)" : ""),
+  );
+  console.log(
+    `[growth] waves: ${data.waves?.length ?? 0} buckets · ` +
+      `concentration: ${data.concentration
+        ? `top10 = ${data.concentration.pct}% of conflicts (${data.concentration.windowDays}d)`
+        : "skipped"}`,
   );
   const d = data.deltas;
   console.log(
