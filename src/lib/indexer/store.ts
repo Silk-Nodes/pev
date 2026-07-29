@@ -2771,5 +2771,179 @@ export async function getContractMovers(
   });
 }
 
+// ─── chain growth (/scale) ───────────────────────────────────────
+// Three questions, one cached payload:
+//   1. throughput growth      · txs + blocks per day
+//   2. working-surface growth · contracts first becoming ACTIVE per week
+//   3. execution health       · parallelism score + conflicts per block
+// (1) and (3) come from the same daily rollup over `blocks`; (2) reads
+// contract_index.first_block. All of it is precomputed out-of-band and
+// cached, the page never aggregates. See [[pev-db-contention]].
+
+export interface GrowthDay {
+  day: string; // YYYY-MM-DD
+  blocks: number;
+  txs: number;
+  avgScore: number;
+  conflicts: number;
+  /** conflicts / blocks, the normalized contention metric */
+  cpb: number;
+}
+export interface GrowthWeek {
+  week: string; // YYYY-MM-DD (week start)
+  newContracts: number;
+}
+export interface GrowthData {
+  windowDays: number;
+  daily: GrowthDay[];
+  newContracts: GrowthWeek[];
+  totals: {
+    blocks: number;
+    txs: number;
+    conflicts: number;
+    /** distinct contracts pev has ever seen active */
+    contractsTracked: number | null;
+  };
+  /** first vs last complete week, for the "growth" callouts */
+  deltas: {
+    txsPct: number | null;
+    scorePct: number | null;
+    cpbPct: number | null;
+  };
+  /** true if a section timed out and was skipped */
+  partial: boolean;
+}
+
+export async function refreshGrowthData(
+  opts: { windowDays?: number; timeoutMs?: number } = {},
+): Promise<GrowthData> {
+  const windowDays = opts.windowDays ?? 30;
+  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const blocksPerDay = 216_000;
+
+  const tip = await queryOne<{ m: string | null }>(`SELECT max(number)::text AS m FROM blocks`);
+  const head = tip?.m ? parseInt(tip.m, 10) : 0;
+  const fromBlock = Math.max(0, head - blocksPerDay * windowDays);
+
+  let partial = false;
+  const guarded = async <T extends Record<string, unknown>>(
+    text: string,
+    params: unknown[],
+  ): Promise<T[]> => {
+    try {
+      const { rows } = await runWithStatementTimeout<T>(timeoutMs, text, params);
+      return rows;
+    } catch (err) {
+      console.warn(`[growth] query degraded: ${(err as Error).message}`);
+      partial = true;
+      return [];
+    }
+  };
+
+  // 1 + 3: one daily rollup gives throughput AND execution health.
+  const dayRows = await guarded<{
+    day: string;
+    blocks: string;
+    txs: string;
+    avg_score: string;
+    conflicts: string;
+  }>(
+    `SELECT to_char(date_trunc('day', timestamp), 'YYYY-MM-DD') AS day,
+            count(*)::text              AS blocks,
+            sum(tx_count)::text         AS txs,
+            avg(parallelism_score)::text AS avg_score,
+            sum(conflict_count)::text   AS conflicts
+       FROM blocks
+      WHERE number > $1
+      GROUP BY 1
+      ORDER BY 1`,
+    [fromBlock],
+  );
+  const daily: GrowthDay[] = dayRows.map((r) => {
+    const blocks = parseInt(r.blocks, 10);
+    const conflicts = parseInt(r.conflicts, 10);
+    return {
+      day: r.day,
+      blocks,
+      txs: parseInt(r.txs, 10),
+      avgScore: Math.round(parseFloat(r.avg_score) * 10) / 10,
+      conflicts,
+      cpb: blocks > 0 ? Math.round((conflicts / blocks) * 100) / 100 : 0,
+    };
+  });
+
+  // 2: contracts that first became ACTIVE in each week. Note this is
+  // "first seen executing", not "deployed", a better signal anyway.
+  const weekRows = await guarded<{ week: string; n: string }>(
+    `SELECT to_char(date_trunc('week', b.timestamp), 'YYYY-MM-DD') AS week,
+            count(*)::text AS n
+       FROM contract_index ci
+       JOIN blocks b ON b.number = ci.first_block
+      WHERE ci.first_block > $1
+      GROUP BY 1
+      ORDER BY 1`,
+    [fromBlock],
+  );
+  const newContracts: GrowthWeek[] = weekRows.map((r) => ({
+    week: r.week,
+    newContracts: parseInt(r.n, 10),
+  }));
+
+  const trackedRow = await guarded<{ n: string }>(
+    `SELECT count(*)::text AS n FROM contract_index`,
+    [],
+  );
+
+  // Deltas: first vs last COMPLETE 7-day block inside the window.
+  const complete = daily.slice(0, Math.floor(daily.length / 7) * 7);
+  const pct = (a: number, b: number) => (a > 0 ? Math.round(((b - a) / a) * 1000) / 10 : null);
+  let txsPct: number | null = null;
+  let scorePct: number | null = null;
+  let cpbPct: number | null = null;
+  if (complete.length >= 14) {
+    const first = complete.slice(0, 7);
+    const last = complete.slice(-7);
+    const sum = (xs: GrowthDay[], k: "txs" | "blocks" | "conflicts") =>
+      xs.reduce((a, d) => a + d[k], 0);
+    const mean = (xs: GrowthDay[]) => xs.reduce((a, d) => a + d.avgScore, 0) / xs.length;
+    txsPct = pct(sum(first, "txs"), sum(last, "txs"));
+    scorePct = pct(mean(first), mean(last));
+    const cpbA = sum(first, "conflicts") / Math.max(sum(first, "blocks"), 1);
+    const cpbB = sum(last, "conflicts") / Math.max(sum(last, "blocks"), 1);
+    cpbPct = pct(cpbA, cpbB);
+  }
+
+  return {
+    windowDays,
+    daily,
+    newContracts,
+    totals: {
+      blocks: daily.reduce((a, d) => a + d.blocks, 0),
+      txs: daily.reduce((a, d) => a + d.txs, 0),
+      conflicts: daily.reduce((a, d) => a + d.conflicts, 0),
+      contractsTracked: trackedRow[0]?.n ? parseInt(trackedRow[0].n, 10) : null,
+    },
+    deltas: { txsPct, scorePct, cpbPct },
+    partial,
+  };
+}
+
+export async function writeGrowthCache(payload: GrowthData, refreshMs: number): Promise<void> {
+  await query(
+    `INSERT INTO growth_cache (id, payload, refreshed_at, refresh_ms)
+       VALUES (1, $1::jsonb, NOW(), $2)
+     ON CONFLICT (id) DO UPDATE
+       SET payload = EXCLUDED.payload, refreshed_at = NOW(), refresh_ms = EXCLUDED.refresh_ms`,
+    [JSON.stringify(payload), refreshMs],
+  );
+}
+
+export async function getCachedGrowth(): Promise<{ data: GrowthData; refreshedAt: Date } | null> {
+  const row = await queryOne<{ payload: GrowthData; refreshed_at: Date }>(
+    `SELECT payload, refreshed_at FROM growth_cache WHERE id = 1`,
+  );
+  return row ? { data: row.payload, refreshedAt: row.refreshed_at } : null;
+}
+
 // Re-export the conflict kind so callers don't need two imports
 export type { ConflictKind, PEVStatus };
