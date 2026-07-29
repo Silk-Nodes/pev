@@ -210,11 +210,11 @@ function Report({
         <Stat big={compact(totals.txs)} label="transactions traced" sub={label} />
         <Stat big={compact(totals.blocks)} label="blocks analyzed" sub={`${fmt(totals.blocks)} total`} />
         {w.length > 0 && (
-          <Stat big={compact(totalNew)} label="contracts newly active" sub="in this window" tone={palette.sage} />
+          <Stat big={compact(totalNew)} label="addresses newly active" sub="first seen executing" tone={palette.sage} />
         )}
         <Stat
           big={data.totals.contractsTracked != null ? compact(data.totals.contractsTracked) : "—"}
-          label="contracts tracked"
+          label="addresses tracked"
           sub="ever seen executing"
         />
       </section>
@@ -235,14 +235,16 @@ function Report({
       {w.length > 0 && (
         <Section
           kicker="Working surface"
-          title="More contracts actually running"
-          note={`${fmt(totalNew)} became active`}
+          title="A widening set of active addresses"
+          note={`${fmt(totalNew)} first seen`}
           noteTone={palette.sage}
         >
           <WeekBars weeks={w} />
           <p style={{ fontSize: 13, color: themeA.subtle, lineHeight: 1.6, marginTop: 12, maxWidth: "62ch" }}>
-            Counted the first time a contract actually executes, not when it&apos;s deployed. A
-            deployed contract nobody calls doesn&apos;t add anything to the chain.
+            Counted the first time an address appears in an execution trace, not when it is
+            deployed. Note this counts every address a transaction touches, senders and recipients
+            as well as contracts, so read it as the chain&apos;s active surface rather than a
+            contract-deployment count.
           </p>
         </Section>
       )}
