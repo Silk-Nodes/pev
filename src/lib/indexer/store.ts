@@ -123,12 +123,12 @@ async function writeBlocksRow(
        number, hash, timestamp, tx_count, stateful_count,
        parallelism_factor, parallelism_score, execution_depth,
        conflict_count, blocked_pct, avg_conflicts_per_tx, hot_slot_count,
-       probe_data, engine_version, trace_ms
+       probe_data, engine_version, trace_ms, gas_used, gas_limit
      ) VALUES (
        $1, $2, to_timestamp($3), $4, $5,
        $6, $7, $8,
        $9, $10, $11, $12,
-       $13, $14, $15
+       $13, $14, $15, $16, $17
      )
      ON CONFLICT (number) DO UPDATE SET
        hash                 = EXCLUDED.hash,
@@ -145,7 +145,9 @@ async function writeBlocksRow(
        probe_data           = EXCLUDED.probe_data,
        engine_version       = EXCLUDED.engine_version,
        indexed_at           = NOW(),
-       trace_ms             = EXCLUDED.trace_ms`,
+       trace_ms             = EXCLUDED.trace_ms,
+       gas_used             = EXCLUDED.gas_used,
+       gas_limit            = EXCLUDED.gas_limit`,
     [
       probe.blockNumber,
       hexToBuffer(probe.blockHash),
@@ -169,6 +171,8 @@ async function writeBlocksRow(
       null,
       engineVersion,
       probe.timing.totalMs,
+      probe.gasUsed,
+      probe.gasLimit,
     ],
   );
 }
@@ -2769,6 +2773,381 @@ export async function getContractMovers(
       pctChange: priorCpb > 0 ? ((recentCpb - priorCpb) / priorCpb) * 100 : 0,
     };
   });
+}
+
+// ─── chain growth (/scale) ───────────────────────────────────────
+// Three questions, one cached payload:
+//   1. throughput growth      · txs + blocks per day
+//   2. working-surface growth · contracts first becoming ACTIVE per week
+//   3. execution health       · parallelism score + conflicts per block
+// (1) and (3) come from the same daily rollup over `blocks`; (2) reads
+// contract_index.first_block. All of it is precomputed out-of-band and
+// cached, the page never aggregates. See [[pev-db-contention]].
+
+export interface GrowthDay {
+  day: string; // YYYY-MM-DD
+  blocks: number;
+  txs: number;
+  avgScore: number;
+  conflicts: number;
+  /** conflicts / blocks, the normalized contention metric */
+  cpb: number;
+  /** avg execution_depth: the wave count the score is actually derived from */
+  avgWaves: number;
+  /** gas consumed that day (0 for blocks indexed before gas capture) */
+  gasUsed: number;
+  /** block gas ceiling summed over the day */
+  gasLimit: number;
+}
+
+/** Blocks bucketed by how many execution waves they needed. */
+export interface WaveBucket {
+  waves: number;
+  blocks: number;
+}
+
+/**
+ * Chain-wide contention concentration: which storage slots cause the most
+ * conflicts, and what share of ALL conflicts the top ones account for.
+ *
+ * Deliberately reported as concentration, not as a projected score. The
+ * parallelism score is 100*(1-1/factor) where factor = statefulTxs/waves,
+ * so it is a function of WAVE DEPTH, not of conflict counts. Claiming
+ * "fix these slots and the score becomes X" would require modelling how
+ * removing conflicts collapses waves, which we cannot honestly do.
+ */
+export interface SlotConcentration {
+  windowDays: number;
+  topSlots: { contract: string; label: string | null; slot: string; conflicts: number }[];
+  topConflicts: number;
+  totalConflicts: number;
+  /** share of all conflicts caused by the listed slots, 0..100 */
+  pct: number;
+}
+export interface GrowthWeek {
+  week: string; // YYYY-MM-DD (week start)
+  newContracts: number;
+}
+export interface MonadRelease {
+  tag: string;
+  /** YYYY-MM-DD the release was PUBLISHED (not necessarily activated) */
+  day: string;
+}
+
+/**
+ * Monad node releases, for marking the growth timeline. Fetched from the
+ * public GitHub releases API during the precompute (never on a page
+ * request) so the markers stay current without a hardcoded list.
+ *
+ * Honesty: these are publish dates. A release being cut is not the same
+ * as validators upgrading or a feature activating on mainnet, so the UI
+ * labels them "released", and we only ever show correlation.
+ */
+async function fetchMonadReleases(): Promise<MonadRelease[]> {
+  try {
+    const res = await fetch(
+      "https://api.github.com/repos/category-labs/monad/releases?per_page=100",
+      {
+        headers: { accept: "application/vnd.github+json" },
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+    if (!res.ok) return [];
+    const json = (await res.json()) as {
+      tag_name?: string; published_at?: string; prerelease?: boolean; draft?: boolean;
+    }[];
+    const byDay = new Map<string, string>();
+    for (const r of json) {
+      if (!r.tag_name || !r.published_at || r.prerelease || r.draft) continue;
+      if (/-(rc|alpha|beta)/i.test(r.tag_name)) continue;
+      const day = r.published_at.slice(0, 10);
+      // Same-day releases (e.g. v0.15.1 + v0.15.2) collapse to the latest.
+      const prev = byDay.get(day);
+      if (!prev || r.tag_name.localeCompare(prev, undefined, { numeric: true }) > 0) {
+        byDay.set(day, r.tag_name);
+      }
+    }
+    return [...byDay.entries()]
+      .map(([day, tag]) => ({ day, tag }))
+      .sort((a, b) => a.day.localeCompare(b.day));
+  } catch {
+    return [];
+  }
+}
+
+export interface GrowthHistory {
+  /** earliest day pev has indexed (YYYY-MM-DD) */
+  firstDay: string | null;
+  lastDay: string | null;
+  firstBlock: number | null;
+  lastBlock: number | null;
+  /** calendar days of history available */
+  daysAvailable: number | null;
+}
+export interface GrowthData {
+  windowDays: number;
+  daily: GrowthDay[];
+  newContracts: GrowthWeek[];
+  /** how far back pev's index actually goes, so the UI can be honest */
+  history?: GrowthHistory;
+  /** Monad node releases, for marking the timeline (correlation only) */
+  releases?: MonadRelease[];
+  /** blocks bucketed by execution wave count */
+  waves?: WaveBucket[];
+  /** which storage slots concentrate the chain's contention */
+  concentration?: SlotConcentration | null;
+  totals: {
+    blocks: number;
+    txs: number;
+    conflicts: number;
+    /** distinct contracts pev has ever seen active */
+    contractsTracked: number | null;
+  };
+  /** first vs last complete week, for the "growth" callouts */
+  deltas: {
+    txsPct: number | null;
+    scorePct: number | null;
+    cpbPct: number | null;
+  };
+  /** true if a section timed out and was skipped */
+  partial: boolean;
+}
+
+export async function refreshGrowthData(
+  opts: { windowDays?: number; timeoutMs?: number; concentrationDays?: number } = {},
+): Promise<GrowthData> {
+  const windowDays = opts.windowDays ?? 30;
+  const timeoutMs = opts.timeoutMs ?? 60_000;
+  const blocksPerDay = 216_000;
+
+  const tip = await queryOne<{ m: string | null }>(`SELECT max(number)::text AS m FROM blocks`);
+  const head = tip?.m ? parseInt(tip.m, 10) : 0;
+  const fromBlock = Math.max(0, head - blocksPerDay * windowDays);
+
+  let partial = false;
+  const guarded = async <T extends Record<string, unknown>>(
+    text: string,
+    params: unknown[],
+  ): Promise<T[]> => {
+    try {
+      const { rows } = await runWithStatementTimeout<T>(timeoutMs, text, params);
+      return rows;
+    } catch (err) {
+      console.warn(`[growth] query degraded: ${(err as Error).message}`);
+      partial = true;
+      return [];
+    }
+  };
+
+  // 1 + 3: one daily rollup gives throughput AND execution health.
+  const dayRows = await guarded<{
+    day: string;
+    blocks: string;
+    txs: string;
+    avg_score: string;
+    avg_waves: string;
+    conflicts: string;
+    gas_used: string;
+    gas_limit: string;
+  }>(
+    `SELECT to_char(date_trunc('day', timestamp), 'YYYY-MM-DD') AS day,
+            count(*)::text              AS blocks,
+            sum(tx_count)::text         AS txs,
+            avg(parallelism_score)::text AS avg_score,
+            avg(execution_depth)::text  AS avg_waves,
+            sum(conflict_count)::text   AS conflicts,
+            sum(gas_used)::text         AS gas_used,
+            sum(gas_limit)::text        AS gas_limit
+       FROM blocks
+      WHERE number > $1
+      GROUP BY 1
+      ORDER BY 1`,
+    [fromBlock],
+  );
+  const daily: GrowthDay[] = dayRows.map((r) => {
+    const blocks = parseInt(r.blocks, 10);
+    const conflicts = parseInt(r.conflicts, 10);
+    return {
+      day: r.day,
+      blocks,
+      txs: parseInt(r.txs, 10),
+      avgScore: Math.round(parseFloat(r.avg_score) * 10) / 10,
+      conflicts,
+      cpb: blocks > 0 ? Math.round((conflicts / blocks) * 100) / 100 : 0,
+      avgWaves: Math.round(parseFloat(r.avg_waves) * 100) / 100,
+      gasUsed: parseInt(r.gas_used ?? "0", 10) || 0,
+      gasLimit: parseInt(r.gas_limit ?? "0", 10) || 0,
+    };
+  });
+
+  // 2: contracts that first became ACTIVE in each week. Note this is
+  // "first seen executing", not "deployed", a better signal anyway.
+  const weekRows = await guarded<{ week: string; n: string }>(
+    `SELECT to_char(date_trunc('week', b.timestamp), 'YYYY-MM-DD') AS week,
+            count(*)::text AS n
+       FROM contract_index ci
+       JOIN blocks b ON b.number = ci.first_block
+      WHERE ci.first_block > $1
+      GROUP BY 1
+      ORDER BY 1`,
+    [fromBlock],
+  );
+  const newContracts: GrowthWeek[] = weekRows.map((r) => ({
+    week: r.week,
+    newContracts: parseInt(r.n, 10),
+  }));
+
+  const trackedRow = await guarded<{ n: string }>(
+    `SELECT count(*)::text AS n FROM contract_index`,
+    [],
+  );
+
+  // How far back the index actually goes. Both ends come off the PK
+  // btree (ORDER BY number LIMIT 1), so this is instant, never a scan
+  // on `timestamp` (which has no index).
+  const histRow = await guarded<{
+    first_ts: Date | null; last_ts: Date | null;
+    min_b: string | null; max_b: string | null;
+  }>(
+    `SELECT (SELECT timestamp FROM blocks ORDER BY number ASC  LIMIT 1) AS first_ts,
+            (SELECT timestamp FROM blocks ORDER BY number DESC LIMIT 1) AS last_ts,
+            (SELECT min(number)::text FROM blocks) AS min_b,
+            (SELECT max(number)::text FROM blocks) AS max_b`,
+    [],
+  );
+  const h = histRow[0];
+  const iso = (d: Date | null | undefined) =>
+    d ? new Date(d).toISOString().slice(0, 10) : null;
+  const history: GrowthHistory = {
+    firstDay: iso(h?.first_ts),
+    lastDay: iso(h?.last_ts),
+    firstBlock: h?.min_b ? parseInt(h.min_b, 10) : null,
+    lastBlock: h?.max_b ? parseInt(h.max_b, 10) : null,
+    daysAvailable:
+      h?.first_ts && h?.last_ts
+        ? Math.max(
+            1,
+            Math.round(
+              (new Date(h.last_ts).getTime() - new Date(h.first_ts).getTime()) / 86_400_000,
+            ),
+          )
+        : null,
+  };
+
+  // Deltas: first vs last COMPLETE 7-day block inside the window.
+  const complete = daily.slice(0, Math.floor(daily.length / 7) * 7);
+  const pct = (a: number, b: number) => (a > 0 ? Math.round(((b - a) / a) * 1000) / 10 : null);
+  let txsPct: number | null = null;
+  let scorePct: number | null = null;
+  let cpbPct: number | null = null;
+  if (complete.length >= 14) {
+    const first = complete.slice(0, 7);
+    const last = complete.slice(-7);
+    const sum = (xs: GrowthDay[], k: "txs" | "blocks" | "conflicts") =>
+      xs.reduce((a, d) => a + d[k], 0);
+    const mean = (xs: GrowthDay[]) => xs.reduce((a, d) => a + d.avgScore, 0) / xs.length;
+    txsPct = pct(sum(first, "txs"), sum(last, "txs"));
+    scorePct = pct(mean(first), mean(last));
+    const cpbA = sum(first, "conflicts") / Math.max(sum(first, "blocks"), 1);
+    const cpbB = sum(last, "conflicts") / Math.max(sum(last, "blocks"), 1);
+    cpbPct = pct(cpbA, cpbB);
+  }
+
+  // #1 Wave distribution. The score IS wave depth (factor = statefulTxs /
+  // executionDepth), so this is the mechanism behind every score number
+  // on the page. Cheap: a GROUP BY over the same `blocks` range.
+  const waveRows = await guarded<{ waves: string; blocks: string }>(
+    `SELECT execution_depth::text AS waves, count(*)::text AS blocks
+       FROM blocks
+      WHERE number > $1
+      GROUP BY execution_depth
+      ORDER BY execution_depth
+      LIMIT 40`,
+    [fromBlock],
+  );
+  const waves: WaveBucket[] = waveRows.map((r) => ({
+    waves: parseInt(r.waves, 10),
+    blocks: parseInt(r.blocks, 10),
+  }));
+
+  // #2 Contention concentration. block_hot_slots is the big table, so this
+  // uses its OWN short window (default 7d) regardless of the page window,
+  // and says so in the payload. Chain-wide over 90 days would be brutal.
+  const concWindowDays = Math.min(windowDays, opts.concentrationDays ?? 7);
+  const concFrom = Math.max(0, head - blocksPerDay * concWindowDays);
+  const slotRows = await guarded<{ contract: Buffer; slot: Buffer; conflicts: string }>(
+    `SELECT contract, slot, sum(conflicts_caused)::text AS conflicts
+       FROM block_hot_slots
+      WHERE block_number > $1
+      GROUP BY contract, slot
+      ORDER BY sum(conflicts_caused) DESC
+      LIMIT 10`,
+    [concFrom],
+  );
+  const totalRow = await guarded<{ n: string | null }>(
+    `SELECT sum(conflict_count)::text AS n FROM blocks WHERE number > $1`,
+    [concFrom],
+  );
+  let concentration: SlotConcentration | null = null;
+  if (slotRows.length > 0) {
+    const addrs = [...new Set(slotRows.map((r) => bufferToHex(r.contract)))];
+    const labels = await resolveManyContracts(addrs);
+    const topSlots = slotRows.map((r) => {
+      const contract = bufferToHex(r.contract);
+      return {
+        contract,
+        label: labels.get(contract) ?? null,
+        slot: bufferToHex(r.slot),
+        conflicts: parseInt(r.conflicts, 10),
+      };
+    });
+    const topConflicts = topSlots.reduce((a, x) => a + x.conflicts, 0);
+    const totalConflicts = totalRow[0]?.n ? parseInt(totalRow[0].n, 10) : 0;
+    concentration = {
+      windowDays: concWindowDays,
+      topSlots,
+      topConflicts,
+      totalConflicts,
+      pct: totalConflicts > 0 ? Math.round((topConflicts / totalConflicts) * 1000) / 10 : 0,
+    };
+  }
+
+  const releases = await fetchMonadReleases();
+
+  return {
+    windowDays,
+    daily,
+    newContracts,
+    history,
+    releases,
+    waves,
+    concentration,
+    totals: {
+      blocks: daily.reduce((a, d) => a + d.blocks, 0),
+      txs: daily.reduce((a, d) => a + d.txs, 0),
+      conflicts: daily.reduce((a, d) => a + d.conflicts, 0),
+      contractsTracked: trackedRow[0]?.n ? parseInt(trackedRow[0].n, 10) : null,
+    },
+    deltas: { txsPct, scorePct, cpbPct },
+    partial,
+  };
+}
+
+export async function writeGrowthCache(payload: GrowthData, refreshMs: number): Promise<void> {
+  await query(
+    `INSERT INTO growth_cache (id, payload, refreshed_at, refresh_ms)
+       VALUES (1, $1::jsonb, NOW(), $2)
+     ON CONFLICT (id) DO UPDATE
+       SET payload = EXCLUDED.payload, refreshed_at = NOW(), refresh_ms = EXCLUDED.refresh_ms`,
+    [JSON.stringify(payload), refreshMs],
+  );
+}
+
+export async function getCachedGrowth(): Promise<{ data: GrowthData; refreshedAt: Date } | null> {
+  const row = await queryOne<{ payload: GrowthData; refreshed_at: Date }>(
+    `SELECT payload, refreshed_at FROM growth_cache WHERE id = 1`,
+  );
+  return row ? { data: row.payload, refreshedAt: row.refreshed_at } : null;
 }
 
 // Re-export the conflict kind so callers don't need two imports

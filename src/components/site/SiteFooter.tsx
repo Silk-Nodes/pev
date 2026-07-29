@@ -62,6 +62,19 @@ export default function SiteFooter() {
         }}
       >
         <Link
+          href="/docs"
+          className="pev-mono"
+          style={{
+            fontSize: 10,
+            color: themeA.muted,
+            letterSpacing: ".05em",
+            textDecoration: "none",
+          }}
+        >
+          Docs
+        </Link>
+        <span style={{ color: themeA.subtle, fontSize: 10 }}>·</span>
+        <Link
           href="/feedback"
           className="pev-mono"
           style={{

@@ -59,6 +59,11 @@ interface RpcBlock {
   number: Hex;
   hash: Hex;
   timestamp: Hex;
+  /** Gas actually consumed by the block. Already in this response, so
+   *  capturing it costs no extra RPC round-trip. */
+  gasUsed?: Hex;
+  /** Block gas ceiling, for capacity-utilisation math. */
+  gasLimit?: Hex;
   transactions: RpcTx[];
 }
 
@@ -142,6 +147,10 @@ export interface BlockProbe {
   blockNumber: number;
   blockHash: Hex;
   timestamp: number;
+  /** Gas consumed by the block (0 if the node omitted it). */
+  gasUsed: number;
+  /** Block gas limit (0 if the node omitted it). */
+  gasLimit: number;
   txCount: number;
   statefulTxCount: number;
   parallelismFactor: number;
@@ -486,6 +495,8 @@ export async function probeBlock(
     blockNumber: parseInt(block.number, 16),
     blockHash: block.hash,
     timestamp: parseInt(block.timestamp, 16),
+    gasUsed: block.gasUsed ? parseInt(block.gasUsed, 16) : 0,
+    gasLimit: block.gasLimit ? parseInt(block.gasLimit, 16) : 0,
     txCount: txAccesses.length,
     statefulTxCount: txAccesses.filter(
       (t) => t.reads.size > 0 || t.writes.size > 0,

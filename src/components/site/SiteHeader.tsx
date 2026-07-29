@@ -237,8 +237,11 @@ export default function SiteHeader({
             flexShrink: 0,
           }}
         >
+          {/* One highlighted slot at a time: the newest page carries the
+              ember colour + "new" badge, everything else stays quiet so
+              the highlight actually means something. */}
           <Link
-            href="/showcase"
+            href="/scale"
             className="pev-link pev-showcase-cta"
             style={{
               fontFamily: themeA.mono,
@@ -252,65 +255,31 @@ export default function SiteHeader({
               gap: 6,
             }}
           >
-            showcase
+            scale
             <span className="pev-new-badge">new</span>
           </Link>
-          <Link
-            href="/graph"
-            className="pev-link"
-            style={{
-              fontFamily: themeA.mono,
-              fontSize: 11,
-              color: themeA.accent,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-              letterSpacing: "0.05em",
-            }}
-          >
-            graph
-          </Link>
-          <Link
-            href="/analytics"
-            className="pev-link"
-            style={{
-              fontFamily: themeA.mono,
-              fontSize: 11,
-              color: themeA.subtle,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-              letterSpacing: "0.05em",
-            }}
-          >
-            analytics
-          </Link>
-          <Link
-            href="/docs"
-            className="pev-link"
-            style={{
-              fontFamily: themeA.mono,
-              fontSize: 11,
-              color: themeA.subtle,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-              letterSpacing: "0.05em",
-            }}
-          >
-            docs
-          </Link>
-          <Link
-            href="/feedback"
-            className="pev-link"
-            style={{
-              fontFamily: themeA.mono,
-              fontSize: 11,
-              color: themeA.subtle,
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-              letterSpacing: "0.05em",
-            }}
-          >
-            feedback
-          </Link>
+          {[
+            { href: "/showcase", label: "showcase" },
+            { href: "/graph", label: "graph" },
+            { href: "/analytics", label: "analytics" },
+            { href: "/feedback", label: "feedback" },
+          ].map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="pev-link"
+              style={{
+                fontFamily: themeA.mono,
+                fontSize: 11,
+                color: themeA.subtle,
+                textDecoration: "none",
+                whiteSpace: "nowrap",
+                letterSpacing: "0.05em",
+              }}
+            >
+              {item.label}
+            </Link>
+          ))}
           <LiveStatus />
           <a
             href="https://silknodes.io"

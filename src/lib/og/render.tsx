@@ -1988,3 +1988,125 @@ export function renderShowcaseCard(
     </div>
   );
 }
+
+/* ════════════════════════════════════════════════════════════════
+   SCALE CARD, unfurl for /scale (chain growth at the execution layer)
+   ════════════════════════════════════════════════════════════════ */
+
+export interface ScaleCardData {
+  /** transactions traced across the indexed window */
+  txs: number;
+  /** days of complete chain history behind the numbers */
+  days: number;
+  /** current average parallelism score, 0-100 */
+  score: number;
+  /** change in conflicts per block across the window, percent */
+  cpbPct: number | null;
+  footer: { host: string; path: string };
+}
+
+export function renderScaleCard(
+  data: ScaleCardData,
+  variant: CardVariant,
+): React.ReactElement {
+  const c = colorsFor(variant);
+  const compact = (n: number) =>
+    n >= 1_000_000_000 ? `${(n / 1_000_000_000).toFixed(1)}B`
+    : n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
+    : n >= 1_000 ? `${Math.round(n / 1000)}K` : `${n}`;
+  return (
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        background: c.bg,
+        color: c.text,
+        fontFamily: "Inter Tight",
+        padding: "56px 72px",
+        position: "relative",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+        <Lockup colors={c} />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            fontFamily: "JetBrains Mono",
+            fontSize: 13,
+            color: c.subtle,
+            letterSpacing: "0.18em",
+          }}
+        >
+          <span>CHAIN GROWTH</span>
+          <span style={{ marginTop: 2 }}>EXECUTION LAYER</span>
+        </div>
+      </div>
+
+      <div style={{ width: "100%", height: 1, background: c.line, marginTop: 32 }} />
+
+      <div style={{ display: "flex", flex: 1, flexDirection: "column", justifyContent: "center", marginTop: 12 }}>
+        <div
+          style={{
+            fontFamily: "JetBrains Mono",
+            fontSize: 14,
+            color: c.subtle,
+            letterSpacing: "0.18em",
+            marginBottom: 18,
+          }}
+        >
+          {`${data.days} DAYS OF MONAD MAINNET`}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            fontFamily: "Instrument Serif",
+            fontStyle: "italic",
+            fontSize: 72,
+            lineHeight: 1,
+            letterSpacing: "-0.02em",
+            color: c.text,
+          }}
+        >
+          <span>{"Monad is scaling."}</span>
+          <span style={{ marginTop: 8, display: "flex", alignItems: "baseline" }}>
+            <span style={{ color: c.terracotta }}>Is the parallelism</span>
+            <span style={{ marginLeft: "0.3em" }}>{"holding?"}</span>
+          </span>
+        </div>
+        <div
+          style={{
+            fontFamily: "Inter Tight",
+            fontSize: 22,
+            lineHeight: 1.35,
+            color: c.muted,
+            marginTop: 18,
+            maxWidth: 880,
+          }}
+        >
+          Throughput, active contracts, and execution health, traced block by block.
+        </div>
+      </div>
+
+      <div style={{ width: "100%", height: 1, background: c.line, marginTop: 40 }} />
+
+      <div style={{ display: "flex", width: "100%", alignItems: "flex-end", marginTop: 24 }}>
+        <Stat colors={c} number={compact(data.txs)} label="TRANSACTIONS TRACED" />
+        <Stat colors={c} number={`${data.score}`} suffix="/100" label="PARALLELISM SCORE" />
+        <Stat
+          colors={c}
+          number={data.cpbPct != null ? `${data.cpbPct > 0 ? "+" : ""}${Math.round(data.cpbPct)}%` : "—"}
+          label="CONFLICTS PER BLOCK"
+          highlight={data.cpbPct != null && data.cpbPct > 0 ? c.terracotta : c.sage}
+          last
+        />
+      </div>
+
+      <FooterBand colors={c} host={data.footer.host} path={data.footer.path} />
+    </div>
+  );
+}
