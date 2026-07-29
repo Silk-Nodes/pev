@@ -335,6 +335,56 @@ body {
   animation: pev-live-pulse 2s ease-in-out infinite;
 }
 
+/* ─── chart column hover tooltips (/scale) ──────────────────────
+   Instant, styled hover readouts on bar charts. Pure CSS: the whole
+   column is the hover target (not just the drawn bar), so thin bars
+   are still easy to hit. No client JS, works in a server component. */
+.pev-col {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  height: 100%;
+}
+.pev-col-bar {
+  width: 100%;
+  border-radius: 2px 2px 0 0;
+  transition: filter 120ms ease, opacity 120ms ease;
+}
+.pev-col:hover .pev-col-bar { filter: brightness(1.5); opacity: 1 !important; }
+.pev-col-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 5;
+  background: var(--pev-tooltip-bg, #1a1814);
+  border: 1px solid rgba(240, 230, 210, 0.14);
+  border-radius: 3px;
+  padding: 6px 9px;
+  font-family: var(--font-pev-mono), "JetBrains Mono", ui-monospace, monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #efe7d4;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.pev-col:hover .pev-col-tip { opacity: 1; transform: translateX(-50%) translateY(0); }
+/* Keep the first/last tooltips inside the chart box. */
+.pev-col:first-child .pev-col-tip { left: 0; transform: translateX(0) translateY(4px); }
+.pev-col:first-child:hover .pev-col-tip { transform: translateX(0) translateY(0); }
+.pev-col:last-child .pev-col-tip { left: auto; right: 0; transform: translateX(0) translateY(4px); }
+.pev-col:last-child:hover .pev-col-tip { transform: translateX(0) translateY(0); }
+.pev-col-tip b { color: #e28c52; font-weight: 600; }
+.pev-col-tip i { display: block; font-style: normal; color: #8a8577; font-size: 10px; }
+@media (prefers-reduced-motion: reduce) {
+  .pev-col-bar, .pev-col-tip { transition: none; }
+}
+
 /* "new" badge on the showcase nav CTA, a small glowing ember pill that
    pulses to draw attention to the launch. */
 .pev-new-badge {

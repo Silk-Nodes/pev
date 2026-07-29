@@ -284,18 +284,18 @@ export default function SiteHeader({
             analytics
           </Link>
           <Link
-            href="/docs"
+            href="/scale"
             className="pev-link"
             style={{
               fontFamily: themeA.mono,
               fontSize: 11,
-              color: themeA.subtle,
+              color: themeA.accent,
               textDecoration: "none",
               whiteSpace: "nowrap",
               letterSpacing: "0.05em",
             }}
           >
-            docs
+            scale
           </Link>
           <Link
             href="/feedback"

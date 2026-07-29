@@ -112,7 +112,9 @@ function Report({ data, refreshedAt }: { data: GrowthData; refreshedAt: Date }) 
       }}>
         <Stat big={compact(data.totals.txs)} label="transactions traced" sub={`${data.windowDays}-day window`} />
         <Stat big={compact(data.totals.blocks)} label="blocks analyzed" sub={`${fmt(data.totals.blocks)} total`} />
-        <Stat big={compact(totalNew)} label="contracts newly active" sub={`in this window`} tone={palette.sage} />
+        {w.length > 0 && (
+          <Stat big={compact(totalNew)} label="contracts newly active" sub="in this window" tone={palette.sage} />
+        )}
         <Stat
           big={data.totals.contractsTracked != null ? compact(data.totals.contractsTracked) : "—"}
           label="contracts tracked"
@@ -129,7 +131,7 @@ function Report({ data, refreshedAt }: { data: GrowthData; refreshedAt: Date }) 
           : undefined}
         noteTone={data.deltas.txsPct != null && data.deltas.txsPct > 0 ? palette.sage : themeA.muted}
       >
-        <Bars days={d} pick={(x) => x.txs} color={palette.sage} label="transactions per day" />
+        <Bars days={d} pick={(x) => x.txs} color={palette.sage} label="transactions per day" unit="transactions" />
       </Section>
 
       {/* 2 · working surface */}
@@ -159,10 +161,10 @@ function Report({ data, refreshedAt }: { data: GrowthData; refreshedAt: Date }) 
       >
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 20 }}>
           <div>
-            <Bars days={d} pick={(x) => x.avgScore} color={palette.bone} label="parallelism score (0-100)" max={100} />
+            <Bars days={d} pick={(x) => x.avgScore} color={palette.bone} label="parallelism score (0-100)" max={100} unit="/100 parallelism score" />
           </div>
           <div>
-            <Bars days={d} pick={(x) => x.cpb} color={palette.ember} label="conflicts per block" />
+            <Bars days={d} pick={(x) => x.cpb} color={palette.ember} label="conflicts per block" unit="conflicts per block" />
           </div>
         </div>
         <p style={{ fontSize: 14, color: themeA.muted, lineHeight: 1.7, marginTop: 14, maxWidth: "64ch" }}>
@@ -203,38 +205,40 @@ function Report({ data, refreshedAt }: { data: GrowthData; refreshedAt: Date }) 
 /* ── charts (server-rendered SVG, no client JS) ── */
 
 function Bars({
-  days, pick, color, label, max,
+  days, pick, color, label, max, unit,
 }: {
-  days: GrowthDay[]; pick: (d: GrowthDay) => number; color: string; label: string; max?: number;
+  days: GrowthDay[]; pick: (d: GrowthDay) => number; color: string;
+  label: string; max?: number; unit?: string;
 }) {
-  const W = 720, H = 150, PAD = 4;
   const vals = days.map(pick);
   const hi = max ?? Math.max(...vals, 1);
-  const step = W / Math.max(days.length, 1);
-  const bw = Math.max(step - PAD, 1.5);
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H + 18}`} style={{ width: "100%", height: "auto", display: "block" }} role="img" aria-label={label}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 150 }}>
         {days.map((d, i) => {
           const v = pick(d);
-          const h = Math.max((v / hi) * H, v > 0 ? 1.5 : 0);
+          const pctH = Math.max((v / hi) * 100, v > 0 ? 1 : 0);
           return (
-            <rect
-              key={d.day}
-              x={(i * step + PAD / 2).toFixed(1)}
-              y={(H - h).toFixed(1)}
-              width={bw.toFixed(1)}
-              height={h.toFixed(1)}
-              rx={1.5}
-              fill={color}
-              opacity={0.55 + 0.45 * (i / Math.max(days.length - 1, 1))}
-            >
-              <title>{`${d.day}: ${fmt(Math.round(v * 100) / 100)}`}</title>
-            </rect>
+            <div key={d.day} className="pev-col">
+              <div
+                className="pev-col-bar"
+                style={{
+                  height: `${pctH}%`,
+                  background: color,
+                  opacity: 0.55 + 0.45 * (i / Math.max(days.length - 1, 1)),
+                }}
+              />
+              <span className="pev-col-tip">
+                <b>{fmt(Math.round(v * 100) / 100)}</b>{unit ? ` ${unit}` : ""}
+                <i>{d.day}</i>
+                <i>{fmt(d.txs)} txs · {fmt(d.blocks)} blocks</i>
+                <i>score {d.avgScore} · {d.cpb} conflicts/block</i>
+              </span>
+            </div>
           );
         })}
-        <line x1={0} y1={H} x2={W} y2={H} stroke={themeA.border} />
-      </svg>
+      </div>
+      <div style={{ height: 1, background: themeA.border }} />
       <div style={{
         display: "flex", justifyContent: "space-between",
         fontFamily: themeA.mono, fontSize: 11, color: themeA.subtle, marginTop: 6,
@@ -249,28 +253,38 @@ function Bars({
 function WeekBars({ weeks }: { weeks: { week: string; newContracts: number }[] }) {
   const hi = Math.max(...weeks.map((w) => w.newContracts), 1);
   return (
-    <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
-      {weeks.map((w) => (
-        <div key={w.week} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div style={{ flex: 1, width: "100%", display: "flex", alignItems: "flex-end" }}>
+    <>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 10, height: 150 }}>
+        {weeks.map((w) => (
+          <div key={w.week} className="pev-col">
             <div
-              title={`${w.week}: ${fmt(w.newContracts)} contracts`}
+              className="pev-col-bar"
               style={{
-                width: "100%",
                 height: `${Math.max((w.newContracts / hi) * 100, 2)}%`,
-                background: palette.sage, opacity: 0.85, borderRadius: "3px 3px 0 0",
+                background: palette.sage, opacity: 0.85,
               }}
             />
+            <span className="pev-col-tip">
+              <b>{fmt(w.newContracts)}</b> contracts
+              <i>week of {w.week}</i>
+              <i>first seen executing</i>
+            </span>
           </div>
-          <div style={{ fontFamily: themeA.mono, fontSize: 12, color: themeA.text, marginTop: 8 }}>
-            {compact(w.newContracts)}
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        {weeks.map((w) => (
+          <div key={w.week} style={{ flex: 1, textAlign: "center" }}>
+            <div style={{ fontFamily: themeA.mono, fontSize: 12, color: themeA.text }}>
+              {compact(w.newContracts)}
+            </div>
+            <div style={{ fontFamily: themeA.mono, fontSize: 10, color: themeA.subtle, marginTop: 2 }}>
+              {w.week.slice(5)}
+            </div>
           </div>
-          <div style={{ fontFamily: themeA.mono, fontSize: 10, color: themeA.subtle, marginTop: 2 }}>
-            {w.week.slice(5)}
-          </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    </>
   );
 }
 
