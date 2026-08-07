@@ -140,5 +140,5 @@ export const GET = withApi(
       },
     });
   },
-  { requireKey: true, skipRateLimit: true, cacheHeaders: CACHE_HEADERS_NONE },
+  { auth: "bump", skipRateLimit: true, cacheHeaders: CACHE_HEADERS_NONE },
 );

@@ -500,14 +500,97 @@ export default function DocsPage() {
       {/* ─── 6. API reference ───────────────────────────────────── */}
       <SectionHeader id="api" eyebrow="06" title="API reference" />
       <P>
-        pev exposes a handful of read-only JSON endpoints under{" "}
+        pev exposes read-only JSON endpoints under{" "}
         <code style={{ fontFamily: themeA.mono, color: themeA.text }}>
           /api/v1/
         </code>
-        . All endpoints are public, no auth required, no rate limit
-        configured today. Stable surface; we'll version-bump if we have
-        to break anything.
+        . The data endpoints need an API key. Stable surface; we&apos;ll
+        version-bump if we have to break anything.
       </P>
+
+      <P>
+        <strong style={{ color: themeA.text }}>Getting a key.</strong> Email{" "}
+        <a href="mailto:info@silknodes.io?subject=pev%20API%20key" className="pev-link">
+          info@silknodes.io
+        </a>{" "}
+        with what you&apos;re building. Keys are free. We ask mainly so we
+        know who is using the data and can warn you before anything changes.
+      </P>
+
+      <P>
+        <strong style={{ color: themeA.text }}>Using it.</strong> Send the key
+        in an{" "}
+        <code style={{ fontFamily: themeA.mono, color: themeA.text }}>
+          x-api-key
+        </code>{" "}
+        header (or{" "}
+        <code style={{ fontFamily: themeA.mono, color: themeA.text }}>
+          Authorization: Bearer &lt;key&gt;
+        </code>
+        ). Keep it in an environment variable, not in committed code or
+        client-side JavaScript.
+      </P>
+
+      <pre
+        style={{
+          fontFamily: themeA.mono, fontSize: 12.5, lineHeight: 1.6,
+          color: themeA.text, background: palette.surface00,
+          border: `1px solid ${themeA.border}`, borderRadius: themeA.radius,
+          padding: "14px 16px", overflowX: "auto", margin: "0 0 18px",
+        }}
+      >
+        <code>{`curl https://pev.silknodes.io/api/v1/stats \\
+  -H "x-api-key: $PEV_API_KEY"`}</code>
+      </pre>
+
+      <P>
+        Without a valid key those endpoints return{" "}
+        <code style={{ fontFamily: themeA.mono, color: themeA.text }}>401</code>:
+      </P>
+
+      <pre
+        style={{
+          fontFamily: themeA.mono, fontSize: 12.5, lineHeight: 1.6,
+          color: themeA.muted, background: palette.surface00,
+          border: `1px solid ${themeA.border}`, borderRadius: themeA.radius,
+          padding: "14px 16px", overflowX: "auto", margin: "0 0 18px",
+        }}
+      >
+        <code>{`{"error":"api key required","detail":"External requests need an
+ x-api-key header. Contact info@silknodes.io to request access."}`}</code>
+      </pre>
+
+      <P>
+        <strong style={{ color: themeA.text }}>Rate limits.</strong> 60
+        requests per minute. Identified keys get their own bucket, so a busy
+        integration will not eat into anyone else&apos;s quota. Exceeding it
+        returns{" "}
+        <code style={{ fontFamily: themeA.mono, color: themeA.text }}>429</code>{" "}
+        with a{" "}
+        <code style={{ fontFamily: themeA.mono, color: themeA.text }}>
+          Retry-After
+        </code>{" "}
+        header.
+      </P>
+
+      <Caveat title="The live streams work differently">
+        The live SSE streams (
+        <code style={{ fontFamily: themeA.mono, color: themeA.text }}>
+          /live
+        </code>
+        ,{" "}
+        <code style={{ fontFamily: themeA.mono, color: themeA.text }}>
+          /chain-head
+        </code>
+        ,{" "}
+        <code style={{ fontFamily: themeA.mono, color: themeA.text }}>
+          /graph-live
+        </code>
+        ) are opened by the site&apos;s own pages, so browser requests reach
+        them without a key and external callers need one. Everything pev
+        serves is public chain data either way; the key is about knowing who
+        is calling, not about secrecy.
+      </Caveat>
 
       <Endpoint
         method="GET"
