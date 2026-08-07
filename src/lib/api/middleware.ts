@@ -16,6 +16,7 @@
 
 import { NextResponse } from "next/server";
 import { checkRate, ipFromRequest } from "./ratelimit";
+import { isSameOrigin, hasValidApiKey } from "./apikey";
 
 interface ApiOptions {
   /** Headers to merge into every successful response (e.g. Cache-Control) */
@@ -26,6 +27,12 @@ interface ApiOptions {
   rateLimitWindowMs?: number;
   /** Skip rate limit (used for /api/v1/live where the connection IS the rate) */
   skipRateLimit?: boolean;
+  /**
+   * Require an x-api-key header for EXTERNAL callers. Same-origin requests
+   * (the site's own pages) are always allowed through, so enabling this
+   * never breaks the UI. Health checks and preflights stay open.
+   */
+  requireKey?: boolean;
 }
 
 // Next.js's route-handler validator requires the second arg to have
@@ -36,6 +43,25 @@ type Handler = (req: Request, ctx: RouteCtx) => Promise<Response> | Response;
 
 export function withApi(handler: Handler, opts: ApiOptions = {}): Handler {
   return async (req, ctx) => {
+    // ─── 0. API key (external callers only) ───────────────────
+    if (opts.requireKey && req.method !== "OPTIONS" && !isSameOrigin(req) && !hasValidApiKey(req)) {
+      return NextResponse.json(
+        {
+          error: "api key required",
+          detail:
+            "External requests need an x-api-key header. Contact info@silknodes.io to request access.",
+        },
+        {
+          status: 401,
+          headers: {
+            "cache-control": "no-store",
+            "access-control-allow-origin": "*",
+            "www-authenticate": 'ApiKey realm="pev", header="x-api-key"',
+          },
+        },
+      );
+    }
+
     // ─── 1. Rate limit ────────────────────────────────────────
     if (!opts.skipRateLimit) {
       const ip = ipFromRequest(req);

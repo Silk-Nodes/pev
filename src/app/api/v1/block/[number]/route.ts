@@ -45,5 +45,5 @@ export const GET = withApi(
     blockCache.set(n, data);
     return NextResponse.json({ block: n, indexed: true, data });
   },
-  { cacheHeaders: CACHE_HEADERS_IMMUTABLE },
+  { requireKey: true, cacheHeaders: CACHE_HEADERS_IMMUTABLE },
 );

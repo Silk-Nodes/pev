@@ -101,5 +101,5 @@ export const GET = withApi(
       },
     });
   },
-  { skipRateLimit: true, cacheHeaders: CACHE_HEADERS_NONE },
+  { requireKey: true, skipRateLimit: true, cacheHeaders: CACHE_HEADERS_NONE },
 );
