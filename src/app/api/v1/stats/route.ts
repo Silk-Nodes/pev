@@ -87,5 +87,5 @@ export const GET = withApi(
     aggregateCache.set(CACHE_KEY, body);
     return NextResponse.json(body);
   },
-  { requireKey: true, cacheHeaders: CACHE_HEADERS_AGGREGATE },
+  { auth: "strict", cacheHeaders: CACHE_HEADERS_AGGREGATE },
 );

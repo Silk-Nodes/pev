@@ -16,7 +16,7 @@
 
 import { NextResponse } from "next/server";
 import { checkRate, ipFromRequest } from "./ratelimit";
-import { isSameOrigin, hasValidApiKey } from "./apikey";
+import { checkStrictKey, checkBumpKey, type KeyOutcome } from "./apikey";
 
 interface ApiOptions {
   /** Headers to merge into every successful response (e.g. Cache-Control) */
@@ -28,11 +28,15 @@ interface ApiOptions {
   /** Skip rate limit (used for /api/v1/live where the connection IS the rate) */
   skipRateLimit?: boolean;
   /**
-   * Require an x-api-key header for EXTERNAL callers. Same-origin requests
-   * (the site's own pages) are always allowed through, so enabling this
-   * never breaks the UI. Health checks and preflights stay open.
+   * "strict": a valid x-api-key is required, no same-origin bypass. For
+   * data endpoints with no browser callers. A real boundary, and it fails
+   * CLOSED in production when PEV_API_KEYS is unset.
+   *
+   * "bump": same-origin passes, external callers need a key. Only for the
+   * SSE routes the browser must reach. Friction, not a boundary, since any
+   * credential in public client JS is public.
    */
-  requireKey?: boolean;
+  auth?: "strict" | "bump";
 }
 
 // Next.js's route-handler validator requires the second arg to have
@@ -43,28 +47,40 @@ type Handler = (req: Request, ctx: RouteCtx) => Promise<Response> | Response;
 
 export function withApi(handler: Handler, opts: ApiOptions = {}): Handler {
   return async (req, ctx) => {
-    // ─── 0. API key (external callers only) ───────────────────
-    if (opts.requireKey && req.method !== "OPTIONS" && !isSameOrigin(req) && !hasValidApiKey(req)) {
-      return NextResponse.json(
-        {
-          error: "api key required",
-          detail:
-            "External requests need an x-api-key header. Contact info@silknodes.io to request access.",
-        },
-        {
-          status: 401,
-          headers: {
-            "cache-control": "no-store",
-            "access-control-allow-origin": "*",
-            "www-authenticate": 'ApiKey realm="pev", header="x-api-key"',
+    // ─── 0. API key ───────────────────────────────────────────
+    let keyId: string | null = null;
+    if (opts.auth && req.method !== "OPTIONS") {
+      const outcome: KeyOutcome =
+        opts.auth === "strict" ? checkStrictKey(req) : checkBumpKey(req);
+      if (!outcome.ok) {
+        const path = new URL(req.url).pathname;
+        console.warn(`[apikey] denied ${req.method} ${path} (${outcome.reason})`);
+        // One generic body for every failure mode. Never reveal whether a
+        // key was wrong, absent, or the server misconfigured.
+        return NextResponse.json(
+          {
+            error: "api key required",
+            detail:
+              "External requests need an x-api-key header. Contact info@silknodes.io to request access.",
           },
-        },
-      );
+          {
+            status: 401,
+            headers: {
+              "cache-control": "no-store",
+              "access-control-allow-origin": "*",
+              "www-authenticate": 'ApiKey realm="pev", header="x-api-key"',
+            },
+          },
+        );
+      }
+      keyId = outcome.keyId;
     }
 
     // ─── 1. Rate limit ────────────────────────────────────────
     if (!opts.skipRateLimit) {
-      const ip = ipFromRequest(req);
+      // Identified callers get their own bucket, so one noisy key cannot
+      // exhaust an IP's quota and per-key usage is attributable.
+      const ip = keyId ? `key:${keyId}` : ipFromRequest(req);
       const result = checkRate(
         ip,
         opts.rateLimit ?? 60,
@@ -113,6 +129,10 @@ export function withApi(handler: Handler, opts: ApiOptions = {}): Handler {
     response.headers.set("access-control-allow-origin", "*");
     response.headers.set("access-control-allow-methods", "GET");
     response.headers.set("x-pev-version", "v1");
+    if (keyId) {
+      // Who called, for usage attribution. Prefix only, never the key.
+      console.info(`[apikey] ${req.method} ${new URL(req.url).pathname} key=${keyId}`);
+    }
 
     return response;
   };

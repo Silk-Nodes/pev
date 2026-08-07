@@ -76,7 +76,7 @@ export const GET = withApi(
     aggregateCache.set(cacheKey, body);
     return NextResponse.json(body);
   },
-  { requireKey: true, cacheHeaders: CACHE_HEADERS_AGGREGATE },
+  { auth: "strict", cacheHeaders: CACHE_HEADERS_AGGREGATE },
 );
 
 interface BlockTopRow {
