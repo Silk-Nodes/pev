@@ -75,7 +75,7 @@ export const POST = withApi(
     const addresses = Array.isArray(body.addresses) ? body.addresses : [];
     return doEnrich(selectors, addresses);
   },
-  { cacheHeaders: CACHE_HEADERS_AGGREGATE },
+  { requireKey: true, cacheHeaders: CACHE_HEADERS_AGGREGATE },
 );
 
 export const GET = withApi(
@@ -91,5 +91,5 @@ export const GET = withApi(
       .filter(Boolean);
     return doEnrich(selectors, addresses);
   },
-  { cacheHeaders: CACHE_HEADERS_AGGREGATE },
+  { requireKey: true, cacheHeaders: CACHE_HEADERS_AGGREGATE },
 );

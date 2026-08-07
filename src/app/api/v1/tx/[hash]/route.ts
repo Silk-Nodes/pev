@@ -98,5 +98,5 @@ export const GET = withApi(
       })),
     });
   },
-  { cacheHeaders: CACHE_HEADERS_IMMUTABLE },
+  { requireKey: true, cacheHeaders: CACHE_HEADERS_IMMUTABLE },
 );
