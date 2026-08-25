@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import {
   getCachedCooccurrenceGraph,
-  getCooccurrenceGraph,
   type CooccurrenceGraph as GraphData,
 } from "@/lib/indexer/store";
 import { themeA, palette } from "@/components/parallel/theme";
@@ -17,9 +16,9 @@ import { CooccurrenceGraph } from "@/components/parallel/CooccurrenceGraph";
  *
  * Data source: the cooccurrence_cache row, precomputed by
  * scripts/refresh-cooccurrence-graph.ts from the contract_pair_daily
- * rollup. The page is a single cache read; it never aggregates live.
- * Falls back to a one-off live build only if the cache is empty (fresh
- * deploy before the first refresh).
+ * rollup. The page is a single cache read and never aggregates live, not
+ * even when the cache is empty: it serves a warming-up state instead, so
+ * a burst of visitors can never starve the indexer.
  */
 
 export const dynamic = "force-dynamic";
@@ -46,8 +45,6 @@ export const metadata: Metadata = {
   },
 };
 
-const WINDOW_DAYS = 7;
-
 export default async function GraphPage() {
   let data: GraphData | null = null;
   let refreshedAt: Date | null = null;
@@ -57,9 +54,11 @@ export default async function GraphPage() {
       data = cached.data;
       refreshedAt = cached.refreshedAt;
     } else {
-      // Cold cache fallback. Light (reads the rollup, not source tables).
-      console.warn("[graph] cache empty, falling back to live build");
-      data = await getCooccurrenceGraph(WINDOW_DAYS);
+      // Cache read ONLY, no live fallback. Aggregating on a request means a
+      // burst of visitors can starve the indexer, which is exactly what the
+      // analytics page was doing. The existing empty state below covers this.
+      // See [[pev-db-contention]].
+      console.warn("[graph] cache empty, serving warming-up state (no live build)");
     }
   } catch (err) {
     console.warn("[graph] data read failed:", (err as Error).message);
