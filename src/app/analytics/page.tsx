@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import {
-  getAnalyticsData,
   getCachedAnalyticsData,
   type AnalyticsData,
   type AnalyticsDayPoint,
@@ -91,10 +90,16 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function AnalyticsPage() {
-  // Hot path: read the precomputed payload from analytics_cache
-  // (refreshed every 5 min by the systemd timer). ~5ms PK lookup, no
-  // aggregation. Falls through to live computation only when the cache
-  // is empty (fresh deploy, before the first refresh has run).
+  // Cache read ONLY. This page must never aggregate on a request.
+  //
+  // It used to fall through to getAnalyticsData() when analytics_cache was
+  // empty, which meant every visitor ran a multi-minute scan over
+  // tx_executions. With the refresh timer disabled after the 2026-06-18
+  // contention incident the cache goes stale, so concurrent visitors were
+  // each firing that query and starving the live indexer. Traffic melting
+  // the database is not an acceptable failure mode: serve a warming-up
+  // state instead and let the out-of-band refresh fill the cache.
+  // See [[pev-db-contention]].
   let data: AnalyticsData | null = null;
   let cacheAge: { refreshedAt: Date; refreshMs: number | null } | null = null;
   try {
@@ -103,9 +108,7 @@ export default async function AnalyticsPage() {
       data = cached.data;
       cacheAge = { refreshedAt: cached.refreshedAt, refreshMs: cached.refreshMs };
     } else {
-      // Cold cache fallback. Slow but always works.
-      console.warn("[analytics] cache empty, falling back to live computation");
-      data = await getAnalyticsData(WINDOW_DAYS);
+      console.warn("[analytics] cache empty, serving warming-up state (no live fallback)");
     }
   } catch (err) {
     console.warn("[analytics] data read failed:", (err as Error).message);
@@ -166,10 +169,26 @@ export default async function AnalyticsPage() {
             </>
           }
         />
-        <p style={{ color: themeA.muted, marginTop: 32 }}>
-          Not enough indexed data yet to compute analytics. Check back in a
-          few minutes.
-        </p>
+        <div
+          style={{
+            marginTop: 32,
+            padding: "24px 20px",
+            background: palette.surface03,
+            border: `1px dashed ${themeA.border}`,
+            borderRadius: themeA.radius,
+            color: themeA.muted,
+            fontSize: 14,
+            lineHeight: 1.6,
+            maxWidth: "62ch",
+          }}
+        >
+          <div style={{ color: themeA.text, fontSize: 16, marginBottom: 8 }}>
+            Warming up
+          </div>
+          These figures are precomputed out-of-band so this page never runs a
+          heavy query on a visit. They appear as soon as the analytics refresh
+          has run.
+        </div>
         <SiteFooter />
       </main>
     );
