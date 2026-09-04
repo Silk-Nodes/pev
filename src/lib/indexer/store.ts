@@ -757,6 +757,20 @@ const WINDOW_BLOCK_COUNT: Record<ContractWindowKey, number | null> = {
 };
 
 /**
+ * Window lengths in HOURS. These are what getContractDetail actually uses
+ * to resolve a block range, via the blocks.timestamp index. WINDOW_BLOCK_COUNT
+ * above is kept only for CONTRACT_WINDOW_BLOCKS, which other callers import;
+ * it is an approximation and must not be used to bound a query.
+ */
+const WINDOW_HOURS: Record<ContractWindowKey, number | null> = {
+  "1h": 1,
+  "24h": 24,
+  "7d": 24 * 7,
+  "30d": 24 * 30,
+  all: null,
+};
+
+/**
  * Legacy export. Pre-windowing code paths used a single global constant.
  * Keeping the name so callers that imported it still compile; new code
  * should use ContractWindowKey + getContractDetail(addr, window).
@@ -779,20 +793,39 @@ export async function getContractDetail(
   if (!/^0x[0-9a-f]{40}$/.test(lower)) return null;
   const buf = Buffer.from(lower.slice(2), "hex");
 
-  // Resolve window. For finite windows we anchor to the current chain
-  // tip and subtract the window size. For `all`, we previously dropped
-  // the block_number predicate entirely, which let the planner pick a
-  // GIN-only plan that scanned millions of rows for popular contracts
-  // and timed out. Now `all` uses an explicit wide range (90 days) so
-  // the planner has a btree path to choose, while still covering every
-  // block we've actually indexed today.
-  const ALL_WINDOW_BLOCKS = BLOCKS_PER_HOUR * 24 * 90; // 90 days of headroom
-  const blockCount = WINDOW_BLOCK_COUNT[windowKey] ?? ALL_WINDOW_BLOCKS;
-  const tipRow = await queryOne<{ hi: string }>(
-    `SELECT max(number)::text AS hi FROM blocks`,
+  // Resolve the window. `all` never drops the block_number predicate:
+  // without a lower bound the planner picks a GIN-only plan that scans
+  // millions of rows for popular contracts and times out. Every window,
+  // `all` included, gets an explicit range so a btree path stays available.
+  // Window bounds come from TIMESTAMPS, not from a block-rate constant.
+  //
+  // The old code multiplied BLOCKS_PER_HOUR (7200, i.e. 500ms blocks) by
+  // the window length. Monad has never produced 500ms blocks in the range
+  // we index: it ran at ~400ms (216k/day) until 23 July 2026, then ~302ms
+  // (286k/day) after v0.15.2. So every window was short, and by a margin
+  // that kept moving: "24h" actually covered about 14.5 hours by August.
+  // Deriving the lower bound from `timestamp` is exact today and stays
+  // exact through any future block-time change. idx_blocks_timestamp
+  // makes it an index scan.
+  //
+  // `all` is capped at 30 days rather than 90. At the current block rate
+  // 90 days is ~25M blocks, which no per-statement budget here can scan;
+  // the rung could only ever time out, so it burned budget the narrower
+  // rungs needed. 30 days is the widest window that can actually return.
+  const ALL_WINDOW_HOURS = 24 * 30;
+  const windowHours = WINDOW_HOURS[windowKey] ?? ALL_WINDOW_HOURS;
+  const boundsRes = await runWithStatementTimeout<{ hi: string | null; lo: string | null }>(
+    3_000, // cheap index lookup; it must never be the thing that stalls
+    `SELECT (SELECT max(number) FROM blocks)::text AS hi,
+            (SELECT min(number) FROM blocks
+              WHERE timestamp >= now() - ($1 || ' hours')::interval)::text AS lo`,
+    [String(windowHours)],
   );
-  const windowHi = tipRow ? parseInt(tipRow.hi, 10) : 0;
-  const windowLo = Math.max(0, windowHi - (blockCount - 1));
+  const boundsRow = boundsRes.rows[0];
+  const windowHi = boundsRow?.hi ? parseInt(boundsRow.hi, 10) : 0;
+  // No block inside the window (quiet chain, or an index that starts
+  // later than the window) falls back to the tip so the range stays valid.
+  const windowLo = boundsRow?.lo ? parseInt(boundsRow.lo, 10) : windowHi;
 
   // Single parameterization now that we always have a block lower bound.
   // The planner sees a selective range filter and can choose between
