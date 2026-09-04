@@ -75,8 +75,22 @@ async function main(): Promise<number> {
       `per-window timeout=${perWindowTimeoutMs}ms · budget=${budgetMs / 1000}s`,
   );
 
+  // Explicit addresses skip target selection entirely. That query is one
+  // aggregate over block_hot_slots and it is the part most likely to blow
+  // its budget on a loaded box, so seeding the cache for known-important
+  // contracts should not depend on it succeeding.
+  const explicit = listArg("addresses", []).map((a) => a.toLowerCase());
+  const badAddr = explicit.filter((a) => !/^0x[0-9a-f]{40}$/.test(a));
+  if (badAddr.length) {
+    console.error(`[details] not an address: ${badAddr.join(", ")}`);
+    return 1;
+  }
+
   let addrs: string[];
-  try {
+  if (explicit.length > 0) {
+    addrs = explicit;
+    console.log(`[details] ${addrs.length} address(es) given, skipping target selection`);
+  } else try {
     addrs = await getContractsToPrecompute(limit, lookbackBlocks, targetTimeoutMs);
   } catch (err) {
     // Target selection is the one query that must succeed; without it
