@@ -48,9 +48,14 @@ const VALID: readonly string[] = ["1h", "24h", "7d", "30d", "all"];
 
 async function main(): Promise<number> {
   const limit = intArg("limit", 40);
-  // ~1 day at the current block rate. Blocks, not days, so the cost of
-  // picking targets does not move when block time changes.
-  const lookbackBlocks = intArg("lookback-blocks", 300_000);
+  // ~4 hours at the current block rate, about 800k block_hot_slots rows.
+  // A full day (300k blocks, ~4.7M rows) blew a 60s timeout on the live
+  // box. The contended-contract ranking is stable over hours, so the
+  // shorter range costs nothing that matters.
+  const lookbackBlocks = intArg("lookback-blocks", 50_000);
+  // Picking targets is one aggregate and it runs once per job, so it gets
+  // its own generous budget rather than sharing the per-window one.
+  const targetTimeoutMs = intArg("target-timeout", 300_000);
   // 24h and 7d are what the UI actually opens with. 30d and `all` are
   // opt-in because they are the windows that cost the most and get the
   // fewest views.
@@ -70,7 +75,19 @@ async function main(): Promise<number> {
       `per-window timeout=${perWindowTimeoutMs}ms · budget=${budgetMs / 1000}s`,
   );
 
-  const addrs = await getContractsToPrecompute(limit, lookbackBlocks);
+  let addrs: string[];
+  try {
+    addrs = await getContractsToPrecompute(limit, lookbackBlocks, targetTimeoutMs);
+  } catch (err) {
+    // Target selection is the one query that must succeed; without it
+    // there is nothing to precompute. Fail with the knob to turn rather
+    // than a raw pg stack trace.
+    console.error(
+      `[details] could not pick targets: ${(err as Error).message}\n` +
+        `[details] try a shorter range, e.g. --lookback-blocks=20000`,
+    );
+    return 1;
+  }
   if (addrs.length === 0) {
     // No hot slots in the recent range means the indexer is not writing,
     // which is a much bigger problem than a cold cache. Say so rather than
