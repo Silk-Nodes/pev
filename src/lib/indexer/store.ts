@@ -841,12 +841,18 @@ export async function getCachedContractDetail(
  * busy ones.
  *
  * Bounded by a block range off the tip rather than a date, so the cost
- * does not move when block time does. The default is about a day.
+ * does not move when block time does.
+ *
+ * Keep the range SMALL. block_hot_slots holds 597M rows across 128 days,
+ * so a day is ~4.7M rows and aggregating that blew a 60s timeout on the
+ * live box. Four hours is ~800k rows and ranks the same contracts: which
+ * contracts dominate contention is stable over hours, so a wider range
+ * buys accuracy nobody can perceive at a cost that fails the job.
  */
 export async function getContractsToPrecompute(
   limit: number,
   lookbackBlocks: number,
-  timeoutMs = 60_000,
+  timeoutMs = 300_000,
 ): Promise<string[]> {
   const res = await runWithStatementTimeout<{ contract: Buffer }>(
     timeoutMs,
