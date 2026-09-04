@@ -777,6 +777,80 @@ const WINDOW_HOURS: Record<ContractWindowKey, number | null> = {
  */
 export const CONTRACT_WINDOW_BLOCKS = WINDOW_BLOCK_COUNT["7d"] ?? 5000;
 
+/* ────────────────────────────────────────────────────────────────────
+ * /contract precompute
+ *
+ * getContractDetail below is the EXPENSIVE path. It is now called by the
+ * refresh job, not by the page. See db/migrations/021 for why.
+ * ──────────────────────────────────────────────────────────────────── */
+
+/** Write one precomputed window payload for one contract. */
+export async function writeContractDetailCache(
+  addrHex: string,
+  windowKey: ContractWindowKey,
+  detail: ContractDetail,
+  refreshMs: number,
+): Promise<void> {
+  const buf = Buffer.from(addrHex.toLowerCase().slice(2), "hex");
+  await query(
+    `INSERT INTO contract_detail_cache (contract, window_key, data, refresh_ms, refreshed_at)
+       VALUES ($1, $2, $3::jsonb, $4, NOW())
+     ON CONFLICT (contract, window_key) DO UPDATE
+       SET data = EXCLUDED.data,
+           refresh_ms = EXCLUDED.refresh_ms,
+           refreshed_at = NOW()`,
+    [buf, windowKey, JSON.stringify(detail), refreshMs],
+  );
+}
+
+/**
+ * Read one precomputed window payload. A primary-key lookup on a bytea
+ * plus a short text, so it is microseconds regardless of how many rows
+ * the contract has in tx_executions. This is the ONLY database work the
+ * page does.
+ */
+export async function getCachedContractDetail(
+  addrHex: string,
+  windowKey: ContractWindowKey,
+): Promise<{ detail: ContractDetail; refreshedAt: Date } | null> {
+  const lower = addrHex.toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(lower)) return null;
+  const buf = Buffer.from(lower.slice(2), "hex");
+  const row = await queryOne<{ data: ContractDetail; refreshed_at: Date }>(
+    `SELECT data, refreshed_at FROM contract_detail_cache
+      WHERE contract = $1 AND window_key = $2`,
+    [buf, windowKey],
+  );
+  if (!row) return null;
+  return { detail: row.data, refreshedAt: row.refreshed_at };
+}
+
+/**
+ * Which contracts the refresh job should cover, most active first.
+ *
+ * Sourced from contract_stats_daily, the per-contract daily rollup, so
+ * picking the list costs a small aggregate over recent days rather than
+ * another scan of tx_executions. `lookbackDays` keeps a contract that
+ * went quiet from holding a slot forever.
+ */
+export async function getContractsToPrecompute(
+  limit: number,
+  lookbackDays: number,
+  timeoutMs = 60_000,
+): Promise<string[]> {
+  const res = await runWithStatementTimeout<{ contract: Buffer }>(
+    timeoutMs,
+    `SELECT contract
+       FROM contract_stats_daily
+      WHERE day >= CURRENT_DATE - ($2::int - 1)
+      GROUP BY contract
+      ORDER BY sum(conflicts_caused_sum) DESC, sum(tx_count) DESC
+      LIMIT $1`,
+    [limit, lookbackDays],
+  );
+  return res.rows.map((r) => `0x${r.contract.toString("hex")}`);
+}
+
 export async function getContractDetail(
   addrHex: string,
   windowKey: ContractWindowKey = DEFAULT_CONTRACT_WINDOW,

@@ -1,0 +1,18 @@
+[Unit]
+Description=pev, fire pev-contract-details-refresh.service every 30 minutes
+
+[Timer]
+OnBootSec=180s
+
+# Timed from when the previous run FINISHED, not on a wall-clock grid,
+# so a long run can never stack on top of itself. The aggregates behind
+# /contract move slowly: a contract's 7-day profile does not meaningfully
+# change in half an hour, and the queries are the heaviest thing this box
+# runs. Freshness is not the constraint here, indexer health is.
+OnUnitInactiveSec=30min
+
+Persistent=true
+Unit=pev-contract-details-refresh.service
+
+[Install]
+WantedBy=timers.target

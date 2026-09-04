@@ -10,11 +10,11 @@ RefuseManualStart=no
 # One-shot: starts, runs the script, exits. Fired by the timer below.
 Type=oneshot
 
-User=deploy
-Group=deploy
-WorkingDirectory=/home/deploy/pev
+User=zoltan
+Group=zoltan
+WorkingDirectory=/home/zoltan/pev
 
-ExecStart=/home/deploy/pev/deploy/run.sh db:refresh-contract-index
+ExecStart=/home/zoltan/pev/deploy/run.sh db:refresh-contract-index
 
 # Hard cap. The unnest+GROUP BY across tx_executions can be 30-90s
 # depending on table size; we give it 5 minutes of headroom and rely
@@ -31,4 +31,4 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/deploy/pev
+ReadWritePaths=/home/zoltan/pev
