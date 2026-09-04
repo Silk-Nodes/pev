@@ -777,6 +777,91 @@ const WINDOW_HOURS: Record<ContractWindowKey, number | null> = {
  */
 export const CONTRACT_WINDOW_BLOCKS = WINDOW_BLOCK_COUNT["7d"] ?? 5000;
 
+/* ────────────────────────────────────────────────────────────────────
+ * /contract precompute
+ *
+ * getContractDetail below is the EXPENSIVE path. It is now called by the
+ * refresh job, not by the page. See db/migrations/021 for why.
+ * ──────────────────────────────────────────────────────────────────── */
+
+/** Write one precomputed window payload for one contract. */
+export async function writeContractDetailCache(
+  addrHex: string,
+  windowKey: ContractWindowKey,
+  detail: ContractDetail,
+  refreshMs: number,
+): Promise<void> {
+  const buf = Buffer.from(addrHex.toLowerCase().slice(2), "hex");
+  await query(
+    `INSERT INTO contract_detail_cache (contract, window_key, data, refresh_ms, refreshed_at)
+       VALUES ($1, $2, $3::jsonb, $4, NOW())
+     ON CONFLICT (contract, window_key) DO UPDATE
+       SET data = EXCLUDED.data,
+           refresh_ms = EXCLUDED.refresh_ms,
+           refreshed_at = NOW()`,
+    [buf, windowKey, JSON.stringify(detail), refreshMs],
+  );
+}
+
+/**
+ * Read one precomputed window payload. A primary-key lookup on a bytea
+ * plus a short text, so it is microseconds regardless of how many rows
+ * the contract has in tx_executions. This is the ONLY database work the
+ * page does.
+ */
+export async function getCachedContractDetail(
+  addrHex: string,
+  windowKey: ContractWindowKey,
+): Promise<{ detail: ContractDetail; refreshedAt: Date } | null> {
+  const lower = addrHex.toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(lower)) return null;
+  const buf = Buffer.from(lower.slice(2), "hex");
+  const row = await queryOne<{ data: ContractDetail; refreshed_at: Date }>(
+    `SELECT data, refreshed_at FROM contract_detail_cache
+      WHERE contract = $1 AND window_key = $2`,
+    [buf, windowKey],
+  );
+  if (!row) return null;
+  return { detail: row.data, refreshedAt: row.refreshed_at };
+}
+
+/**
+ * Which contracts the refresh job should cover, most contended first.
+ *
+ * Sourced from block_hot_slots over a recent block range, NOT from
+ * contract_stats_daily. That rollup is the natural home for this, but it
+ * is empty (0 rows) and backfilling it means grinding 426M tx_executions
+ * rows first, so depending on it would have left /contract broken until
+ * that finished.
+ *
+ * block_hot_slots is written per block by the live indexer, so it is
+ * always current, and ranking by conflicts_caused is a better match for
+ * this page anyway: /contract exists to explain contention, so the
+ * contracts worth precomputing are the contended ones, not merely the
+ * busy ones.
+ *
+ * Bounded by a block range off the tip rather than a date, so the cost
+ * does not move when block time does. The default is about a day.
+ */
+export async function getContractsToPrecompute(
+  limit: number,
+  lookbackBlocks: number,
+  timeoutMs = 60_000,
+): Promise<string[]> {
+  const res = await runWithStatementTimeout<{ contract: Buffer }>(
+    timeoutMs,
+    `WITH tip AS (SELECT max(block_number) AS hi FROM block_hot_slots)
+     SELECT h.contract
+       FROM block_hot_slots h, tip
+      WHERE h.block_number >= tip.hi - $2
+      GROUP BY h.contract
+      ORDER BY sum(h.conflicts_caused) DESC, sum(h.touches) DESC
+      LIMIT $1`,
+    [limit, lookbackBlocks],
+  );
+  return res.rows.map((r) => `0x${r.contract.toString("hex")}`);
+}
+
 export async function getContractDetail(
   addrHex: string,
   windowKey: ContractWindowKey = DEFAULT_CONTRACT_WINDOW,

@@ -1,0 +1,32 @@
+[Unit]
+Description=pev, /contract page payload precompute (writes contract_detail_cache)
+Documentation=https://github.com/Silk-Nodes/pev
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+# One-shot: starts, runs the script, exits. The timer fires it repeatedly.
+Type=oneshot
+
+User=zoltan
+Group=zoltan
+WorkingDirectory=/home/zoltan/pev
+
+# The script has its own wall-clock budget (--budget, default 900s) and
+# stops cleanly when it runs out, so it never overlaps the next tick.
+ExecStart=/home/zoltan/pev/deploy/run.sh contract-details
+
+# Above the script's own 900s budget, so systemd only intervenes if the
+# script itself is wedged rather than merely slow. Stale cache beats a
+# stuck job holding connections the indexer needs.
+TimeoutStartSec=1200s
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pev-contract-details
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/zoltan/pev

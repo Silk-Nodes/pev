@@ -30,7 +30,8 @@
     "deploy": "./deploy/deploy.sh",
     "deploy:restart": "./deploy/deploy.sh --restart-only",
     "deploy:logs:indexer": "ssh $PEV_HOST 'journalctl -u pev-indexer -f'",
-    "deploy:logs:web": "ssh $PEV_HOST 'journalctl -u pev-web -f'"
+    "deploy:logs:web": "ssh $PEV_HOST 'journalctl -u pev-web -f'",
+    "contract-details": "tsx --env-file=.env.local --env-file=.env.production.local scripts/refresh-contract-details.ts"
   },
   "dependencies": {
     "js-sha3": "^0.9.3",

@@ -124,14 +124,18 @@ sudo cp $PEV_PATH/deploy/pev-analytics-refresh.service /etc/systemd/system/
 sudo cp $PEV_PATH/deploy/pev-analytics-refresh.timer   /etc/systemd/system/
 sudo cp $PEV_PATH/deploy/pev-contract-index-refresh.service /etc/systemd/system/
 sudo cp $PEV_PATH/deploy/pev-contract-index-refresh.timer   /etc/systemd/system/
+sudo cp $PEV_PATH/deploy/pev-contract-details-refresh.service /etc/systemd/system/
+sudo cp $PEV_PATH/deploy/pev-contract-details-refresh.timer   /etc/systemd/system/
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now pev-indexer pev-web pev-analytics-refresh.timer pev-contract-index-refresh.timer
+sudo systemctl enable --now pev-indexer pev-web pev-analytics-refresh.timer pev-contract-index-refresh.timer pev-contract-details-refresh.timer
 ```
 
 The two `.timer` units are systemd cron jobs that periodically refresh pre-aggregation tables. Enable the timers, not the underlying oneshot services.
 
-Each unit has hard-coded `User=` and `WorkingDirectory=` fields. Edit them to match your deploy user and `$PEV_PATH` before installing (default expects user `deploy` and `/home/deploy/pev`).
+Each unit has hard-coded `User=`, `Group=` and `WorkingDirectory=` fields. Edit them to match your deploy user and `$PEV_PATH` before installing (they ship as user `zoltan` and `/home/zoltan/pev`).
+
+Get this wrong and systemd fails the unit with `217/USER`, which reads like a permissions problem and is really a missing account. Three units shipped with a `deploy` user that did not exist on the target box: two had been edited by hand on the VM and drifted from the repo, and `pev-contract-index-refresh` was simply never installed, which is why `contract_index` sat frozen for 37 days while every page that reads it quietly served stale answers.
 
 ---
 
