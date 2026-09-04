@@ -757,20 +757,6 @@ const WINDOW_BLOCK_COUNT: Record<ContractWindowKey, number | null> = {
 };
 
 /**
- * Window lengths in HOURS. These are what getContractDetail actually uses
- * to resolve a block range, via the blocks.timestamp index. WINDOW_BLOCK_COUNT
- * above is kept only for CONTRACT_WINDOW_BLOCKS, which other callers import;
- * it is an approximation and must not be used to bound a query.
- */
-const WINDOW_HOURS: Record<ContractWindowKey, number | null> = {
-  "1h": 1,
-  "24h": 24,
-  "7d": 24 * 7,
-  "30d": 24 * 30,
-  all: null,
-};
-
-/**
  * Legacy export. Pre-windowing code paths used a single global constant.
  * Keeping the name so callers that imported it still compile; new code
  * should use ContractWindowKey + getContractDetail(addr, window).
@@ -797,35 +783,30 @@ export async function getContractDetail(
   // without a lower bound the planner picks a GIN-only plan that scans
   // millions of rows for popular contracts and times out. Every window,
   // `all` included, gets an explicit range so a btree path stays available.
-  // Window bounds come from TIMESTAMPS, not from a block-rate constant.
+  // Window bounds are plain block arithmetic off the tip. One indexed
+  // max() and no second query.
   //
-  // The old code multiplied BLOCKS_PER_HOUR (7200, i.e. 500ms blocks) by
-  // the window length. Monad has never produced 500ms blocks in the range
-  // we index: it ran at ~400ms (216k/day) until 23 July 2026, then ~302ms
-  // (286k/day) after v0.15.2. So every window was short, and by a margin
-  // that kept moving: "24h" actually covered about 14.5 hours by August.
-  // Deriving the lower bound from `timestamp` is exact today and stays
-  // exact through any future block-time change. idx_blocks_timestamp
-  // makes it an index scan.
+  // A previous version derived the lower bound from blocks.timestamp so
+  // the window would stay accurate as block time changed. It was more
+  // correct and it broke the page: that lookup carried its own timeout,
+  // and when it did not return in time every rung of the fallback ladder
+  // died on the BOUNDS query before reaching the aggregates it was
+  // supposed to be narrowing. Five rungs failing in sequence is why every
+  // contract, at every window, returned the empty state in a constant
+  // ~9.6s. Small contracts that had always worked broke too.
   //
-  // `all` is capped at 30 days rather than 90. At the current block rate
-  // 90 days is ~25M blocks, which no per-statement budget here can scan;
-  // the rung could only ever time out, so it burned budget the narrower
-  // rungs needed. 30 days is the widest window that can actually return.
-  const ALL_WINDOW_HOURS = 24 * 30;
-  const windowHours = WINDOW_HOURS[windowKey] ?? ALL_WINDOW_HOURS;
-  const boundsRes = await runWithStatementTimeout<{ hi: string | null; lo: string | null }>(
-    3_000, // cheap index lookup; it must never be the thing that stalls
-    `SELECT (SELECT max(number) FROM blocks)::text AS hi,
-            (SELECT min(number) FROM blocks
-              WHERE timestamp >= now() - ($1 || ' hours')::interval)::text AS lo`,
-    [String(windowHours)],
+  // So BLOCKS_PER_HOUR stays approximate on purpose. It errs SHORT of a
+  // true hour (Monad is near 302ms, this assumes 500ms), which means a
+  // window covers less wall-clock time than its label. That is a caveat
+  // the page can state. An extra query in the hot path that can fail is
+  // not a caveat, it is an outage.
+  const ALL_WINDOW_BLOCKS = BLOCKS_PER_HOUR * 24 * 90;
+  const blockCount = WINDOW_BLOCK_COUNT[windowKey] ?? ALL_WINDOW_BLOCKS;
+  const tipRow = await queryOne<{ hi: string }>(
+    `SELECT max(number)::text AS hi FROM blocks`,
   );
-  const boundsRow = boundsRes.rows[0];
-  const windowHi = boundsRow?.hi ? parseInt(boundsRow.hi, 10) : 0;
-  // No block inside the window (quiet chain, or an index that starts
-  // later than the window) falls back to the tip so the range stays valid.
-  const windowLo = boundsRow?.lo ? parseInt(boundsRow.lo, 10) : windowHi;
+  const windowHi = tipRow ? parseInt(tipRow.hi, 10) : 0;
+  const windowLo = Math.max(0, windowHi - (blockCount - 1));
 
   // Single parameterization now that we always have a block lower bound.
   // The planner sees a selective range filter and can choose between
