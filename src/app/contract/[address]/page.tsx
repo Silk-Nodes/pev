@@ -117,6 +117,22 @@ function isQueryTimeout(err: unknown): boolean {
  * ladder. The fixed per-rung budgets below ensure the ladder actually
  * runs end-to-end if needed.
  */
+/**
+ * Hard ceiling on the page's whole data load, above the ladder's own
+ * budget so a normal slow-but-working request still completes. Resolves
+ * to null when the work does not finish in time; the caller renders the
+ * empty state rather than streaming forever.
+ */
+const PAGE_DEADLINE_MS = 20_000;
+
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), ms);
+  });
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
+}
+
 const FALLBACK_TOTAL_BUDGET_MS = 26_000;
 
 // Per-rung budgets, tuned so even very heavy contracts (popular DEX
@@ -316,11 +332,40 @@ export default async function ContractPage({ params, searchParams }: PageParams)
 
   const windowKey = parseWindow(windowParam);
 
-  const [{ detail: contract, resolvedWindow, fellBackFrom }, label] =
-    await Promise.all([
+  // Absolute ceiling on the whole data load.
+  //
+  // Every path below is already individually bounded: per-statement
+  // timeouts on the four aggregates, the ladder's own 26s budget, an
+  // AbortSignal on the Sourcify lookup, connectionTimeoutMillis on the
+  // pool. And yet this page was observed streaming its loading shell and
+  // then never producing a body, for every contract and every window,
+  // including ?window=1h which only spans 7,200 blocks. Something stalls
+  // outside the bounds we set.
+  //
+  // Until that is identified from the server logs, the page must not be
+  // able to hang. A fast, honest "we could not load this" beats a spinner
+  // that spins forever: the reader learns something and the request stops
+  // holding a connection.
+  //
+  // resolveContract is also made non-fatal here. It sits in the same
+  // Promise.all, so a rejection there discarded a perfectly good detail
+  // payload and rendered the error boundary instead.
+  const loaded = await withDeadline(
+    Promise.all([
       getContractDetailWithFallback(lower, windowKey),
-      resolveContract(lower),
-    ]);
+      resolveContract(lower).catch(() => null),
+    ]),
+    PAGE_DEADLINE_MS,
+  );
+  if (!loaded) {
+    console.error(
+      `[contract] data load exceeded ${PAGE_DEADLINE_MS}ms for ${lower} (window=${windowKey})`,
+    );
+  }
+  const [{ detail: contract, resolvedWindow, fellBackFrom }, label] = loaded ?? [
+    { detail: null, resolvedWindow: windowKey, fellBackFrom: null },
+    null,
+  ];
   if (!contract) {
     // Two distinct empty states:
     //   • lastSeen === null  ⇒ never indexed (truly unknown address)
