@@ -125,6 +125,13 @@ function isQueryTimeout(err: unknown): boolean {
  */
 const PAGE_DEADLINE_MS = 20_000;
 
+/**
+ * Separate, much shorter budget for method-name resolution. It is a
+ * cosmetic lookup against third-party directories, so it should never
+ * hold a page for more than a moment.
+ */
+const METHOD_DEADLINE_MS = 4_000;
+
 function withDeadline<T>(work: Promise<T>, ms: number): Promise<T | null> {
   let timer: ReturnType<typeof setTimeout>;
   const deadline = new Promise<null>((resolve) => {
@@ -383,11 +390,25 @@ export default async function ContractPage({ params, searchParams }: PageParams)
   }
 
   // Resolve human-readable method signatures for the per-method breakdown.
-  // Cache-first; only the rare unresolved selector hits 4byte. Empty-set
-  // safe so contracts that only see plain ETH transfers skip this.
-  const methodNames = await resolveManyMethods(
-    contract.methods.map((m) => m.selector),
-  );
+  // Cache-first; only the rare unresolved selector hits 4byte.
+  //
+  // DEADLINED, and this is the important part. This call sits AFTER the
+  // guarded load above, so for a long time it was the one unbounded step
+  // left in the request. It fans a Promise.all across every unresolved
+  // selector, and each one does a 4byte lookup, then an Openchain lookup,
+  // then a cache write, against a pool of 10 connections. A contract with
+  // many unknown selectors queues far more work than the pool can serve,
+  // and nothing above it could stop the page hanging: the load deadline
+  // had already been satisfied.
+  //
+  // Method names are decoration. The table renders raw selectors without
+  // them, which is what it already does for anything 4byte has never
+  // seen. Losing them is not worth a request that never ends.
+  const methodNames =
+    (await withDeadline(
+      resolveManyMethods(contract.methods.map((m) => m.selector)),
+      METHOD_DEADLINE_MS,
+    )) ?? new Map<string, string | null>();
 
   const scoreColor =
     contract.avgParallelismScore >= 70
