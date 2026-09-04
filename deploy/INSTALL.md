@@ -124,11 +124,9 @@ sudo cp $PEV_PATH/deploy/pev-analytics-refresh.service /etc/systemd/system/
 sudo cp $PEV_PATH/deploy/pev-analytics-refresh.timer   /etc/systemd/system/
 sudo cp $PEV_PATH/deploy/pev-contract-index-refresh.service /etc/systemd/system/
 sudo cp $PEV_PATH/deploy/pev-contract-index-refresh.timer   /etc/systemd/system/
-sudo cp $PEV_PATH/deploy/pev-contract-details-refresh.service /etc/systemd/system/
-sudo cp $PEV_PATH/deploy/pev-contract-details-refresh.timer   /etc/systemd/system/
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now pev-indexer pev-web pev-analytics-refresh.timer pev-contract-index-refresh.timer pev-contract-details-refresh.timer
+sudo systemctl enable --now pev-indexer pev-web pev-analytics-refresh.timer pev-contract-index-refresh.timer
 ```
 
 The two `.timer` units are systemd cron jobs that periodically refresh pre-aggregation tables. Enable the timers, not the underlying oneshot services.
