@@ -48,7 +48,9 @@ const VALID: readonly string[] = ["1h", "24h", "7d", "30d", "all"];
 
 async function main(): Promise<number> {
   const limit = intArg("limit", 40);
-  const lookbackDays = intArg("lookback", 7);
+  // ~1 day at the current block rate. Blocks, not days, so the cost of
+  // picking targets does not move when block time changes.
+  const lookbackBlocks = intArg("lookback-blocks", 300_000);
   // 24h and 7d are what the UI actually opens with. 30d and `all` are
   // opt-in because they are the windows that cost the most and get the
   // fewest views.
@@ -64,17 +66,17 @@ async function main(): Promise<number> {
 
   const started = Date.now();
   console.log(
-    `[details] top ${limit} contracts over ${lookbackDays}d · windows=${windows.join(",")} · ` +
+    `[details] top ${limit} contracts over ${lookbackBlocks.toLocaleString()} blocks · windows=${windows.join(",")} · ` +
       `per-window timeout=${perWindowTimeoutMs}ms · budget=${budgetMs / 1000}s`,
   );
 
-  const addrs = await getContractsToPrecompute(limit, lookbackDays);
+  const addrs = await getContractsToPrecompute(limit, lookbackBlocks);
   if (addrs.length === 0) {
-    // contract_stats_daily is empty or stale. Refreshing details against
-    // an empty target list would silently do nothing, so say so loudly:
-    // the rollup is the dependency and it needs its own timer.
+    // No hot slots in the recent range means the indexer is not writing,
+    // which is a much bigger problem than a cold cache. Say so rather than
+    // exiting 0 and looking like a successful no-op.
     console.error(
-      "[details] no contracts from contract_stats_daily. Is the rollup running? (npm run contract-daily)",
+      "[details] no contracts found in block_hot_slots. Is the indexer running?",
     );
     return 1;
   }

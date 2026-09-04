@@ -18,6 +18,12 @@
 --
 -- window_key is TEXT rather than an enum so adding a window later is a
 -- code change, not a migration.
+--
+-- Targets come from block_hot_slots, not contract_stats_daily. The rollup
+-- would be the natural source but it is empty, and filling it means first
+-- grinding 426M tx_executions rows. block_hot_slots is written per block
+-- by the live indexer, so it is current, and ranking by conflicts_caused
+-- suits this page better anyway: /contract exists to explain contention.
 CREATE TABLE IF NOT EXISTS contract_detail_cache (
   contract     BYTEA       NOT NULL,
   window_key   TEXT        NOT NULL,

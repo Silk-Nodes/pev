@@ -826,27 +826,38 @@ export async function getCachedContractDetail(
 }
 
 /**
- * Which contracts the refresh job should cover, most active first.
+ * Which contracts the refresh job should cover, most contended first.
  *
- * Sourced from contract_stats_daily, the per-contract daily rollup, so
- * picking the list costs a small aggregate over recent days rather than
- * another scan of tx_executions. `lookbackDays` keeps a contract that
- * went quiet from holding a slot forever.
+ * Sourced from block_hot_slots over a recent block range, NOT from
+ * contract_stats_daily. That rollup is the natural home for this, but it
+ * is empty (0 rows) and backfilling it means grinding 426M tx_executions
+ * rows first, so depending on it would have left /contract broken until
+ * that finished.
+ *
+ * block_hot_slots is written per block by the live indexer, so it is
+ * always current, and ranking by conflicts_caused is a better match for
+ * this page anyway: /contract exists to explain contention, so the
+ * contracts worth precomputing are the contended ones, not merely the
+ * busy ones.
+ *
+ * Bounded by a block range off the tip rather than a date, so the cost
+ * does not move when block time does. The default is about a day.
  */
 export async function getContractsToPrecompute(
   limit: number,
-  lookbackDays: number,
+  lookbackBlocks: number,
   timeoutMs = 60_000,
 ): Promise<string[]> {
   const res = await runWithStatementTimeout<{ contract: Buffer }>(
     timeoutMs,
-    `SELECT contract
-       FROM contract_stats_daily
-      WHERE day >= CURRENT_DATE - ($2::int - 1)
-      GROUP BY contract
-      ORDER BY sum(conflicts_caused_sum) DESC, sum(tx_count) DESC
+    `WITH tip AS (SELECT max(block_number) AS hi FROM block_hot_slots)
+     SELECT h.contract
+       FROM block_hot_slots h, tip
+      WHERE h.block_number >= tip.hi - $2
+      GROUP BY h.contract
+      ORDER BY sum(h.conflicts_caused) DESC, sum(h.touches) DESC
       LIMIT $1`,
-    [limit, lookbackDays],
+    [limit, lookbackBlocks],
   );
   return res.rows.map((r) => `0x${r.contract.toString("hex")}`);
 }
