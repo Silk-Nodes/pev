@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 import {
+  getContractDetail,
   getContractLastSeen,
   DEFAULT_CONTRACT_WINDOW,
-  getCachedContractDetail,
   type ContractDetail,
   type ContractMethod,
   type ContractWindowKey,
@@ -94,11 +94,34 @@ function isQueryTimeout(err: unknown): boolean {
 }
 
 /**
- * Hard ceiling on the page's whole data load. The cache lookups below
- * are primary-key reads and the external label lookup carries its own
- * AbortSignal, so nothing here should come close. It stays as a backstop:
- * this page has already shipped one stall we could not explain, and a
- * fast empty state beats a spinner that never resolves.
+ * Run getContractDetail with an automatic fallback ladder. If the
+ * requested window times out (Postgres cancels via statement_timeout),
+ * step down to the next-narrower window and retry. Returns the
+ * resolved detail plus the window we ended up serving and the window
+ * the user originally asked for, so the page can show a notice when
+ * they don't match.
+ *
+ * Why a ladder (1h ← 24h ← 7d ← 30d ← all) rather than always falling
+ * back to the smallest: most popular contracts are still fine on `7d`
+ * even when `all` chokes, and we'd rather show a week of data than an
+ * hour.
+ *
+ * Budget math (Cloudflare edge ceiling = 30s):
+ *   per-rung budgets: 7 + 6 + 5 + 3 + 2 = 23s worst case across all 5 rungs
+ *   plus other in-flight work (resolveContract, getContractLastSeen,
+ *   render, network) ≈ 4s
+ *   total ≈ 27s, comfortably under the 30s ceiling.
+ *
+ * Earlier versions passed `remaining - 800ms` as the per-statement
+ * timeout, which gave the first rung ~23s and starved the rest of the
+ * ladder. The fixed per-rung budgets below ensure the ladder actually
+ * runs end-to-end if needed.
+ */
+/**
+ * Hard ceiling on the page's whole data load, above the ladder's own
+ * budget so a normal slow-but-working request still completes. Resolves
+ * to null when the work does not finish in time; the caller renders the
+ * empty state rather than streaming forever.
  */
 const PAGE_DEADLINE_MS = 20_000;
 
@@ -110,49 +133,75 @@ function withDeadline<T>(work: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 }
 
-/**
- * Read the precomputed payload, falling back to narrower windows.
- *
- * This used to be a ladder of live aggregates with per-rung statement
- * timeouts and a total budget, because the page built its four aggregates
- * on every request. That could not work: the GIN bitmap over
- * tx_executions.contracts is built whatever block window you ask for, and
- * it spans 74.3M rows for Perpl and 18.0M for ShMonad. The page hung
- * identically at ?window=1h and ?window=all, which is the tell that the
- * window was never the expensive part.
- *
- * The aggregates now come from scripts/refresh-contract-details.ts on a
- * timer. Each rung here is a primary-key lookup on (contract, window_key),
- * so walking the whole ladder costs microseconds and needs no budget.
- *
- * The fallback survives because precompute coverage is per-window: a
- * contract may have 24h cached but not 7d if the refresh run hit its
- * budget partway through. Showing a narrower window with a notice beats
- * showing nothing.
- */
-async function getCachedDetailWithFallback(
+const FALLBACK_TOTAL_BUDGET_MS = 26_000;
+
+// Per-rung budgets, tuned so even very heavy contracts (popular DEX
+// routers, top tokens) get a chance at the narrow rungs after the wide
+// ones time out. Total worst-case ladder = 4+5+6+6+6 = 27s, which fits
+// inside the 26s budget cap (we'll bail one rung short rather than blow
+// past Cloudflare's 30s edge ceiling).
+//
+// 30d and all share a budget because for our ~7-day-old index they
+// touch the same data. If indexer history grows past 30 days we'll
+// want to give `all` more room or pre-aggregate.
+const PER_RUNG_TIMEOUT_MS: Record<ContractWindowKey, number> = {
+  "1h": 4_000,
+  "24h": 5_000,
+  "7d": 6_000,
+  "30d": 6_000,
+  all: 6_000,
+};
+
+async function getContractDetailWithFallback(
   addr: string,
   requested: ContractWindowKey,
 ): Promise<{
   detail: ContractDetail | null;
   resolvedWindow: ContractWindowKey;
   fellBackFrom: ContractWindowKey | null;
-  refreshedAt: Date | null;
 }> {
+  const start = Date.now();
   let current: ContractWindowKey | null = requested;
   while (current !== null) {
-    const hit = await getCachedContractDetail(addr, current);
-    if (hit) {
+    const remaining = FALLBACK_TOTAL_BUDGET_MS - (Date.now() - start);
+    // Cap this rung's timeout at the smaller of (a) the rung's ideal
+    // budget and (b) what's left of the total. The 1500ms minimum is the
+    // smallest window where we'd still expect a meaningful result; below
+    // that the query barely has time to plan, so we bail to NotSeen.
+    const ideal = PER_RUNG_TIMEOUT_MS[current];
+    const stmtTimeout = Math.min(ideal, remaining - 500);
+    if (stmtTimeout < 1_500) {
       return {
-        detail: hit.detail,
+        detail: null,
         resolvedWindow: current,
-        fellBackFrom: current === requested ? null : requested,
-        refreshedAt: hit.refreshedAt,
+        fellBackFrom: requested === current ? null : requested,
       };
     }
-    current = narrowerWindow(current);
+    try {
+      const detail = await getContractDetail(addr, current, stmtTimeout);
+      return {
+        detail,
+        resolvedWindow: current,
+        fellBackFrom: current === requested ? null : requested,
+      };
+    } catch (err) {
+      if (isQueryTimeout(err)) {
+        const next = narrowerWindow(current);
+        if (next === null) {
+          // Bottomed out; surface as no-data so NotSeen renders cleanly.
+          return {
+            detail: null,
+            resolvedWindow: current,
+            fellBackFrom: requested === current ? null : requested,
+          };
+        }
+        current = next;
+        continue;
+      }
+      throw err;
+    }
   }
-  return { detail: null, resolvedWindow: requested, fellBackFrom: null, refreshedAt: null };
+  return { detail: null, resolvedWindow: requested, fellBackFrom: null };
 }
 
 /**
@@ -303,7 +352,7 @@ export default async function ContractPage({ params, searchParams }: PageParams)
   // payload and rendered the error boundary instead.
   const loaded = await withDeadline(
     Promise.all([
-      getCachedDetailWithFallback(lower, windowKey),
+      getContractDetailWithFallback(lower, windowKey),
       resolveContract(lower).catch(() => null),
     ]),
     PAGE_DEADLINE_MS,
@@ -313,11 +362,10 @@ export default async function ContractPage({ params, searchParams }: PageParams)
       `[contract] data load exceeded ${PAGE_DEADLINE_MS}ms for ${lower} (window=${windowKey})`,
     );
   }
-  const [{ detail: contract, resolvedWindow, fellBackFrom, refreshedAt }, label] =
-    loaded ?? [
-      { detail: null, resolvedWindow: windowKey, fellBackFrom: null, refreshedAt: null },
-      null,
-    ];
+  const [{ detail: contract, resolvedWindow, fellBackFrom }, label] = loaded ?? [
+    { detail: null, resolvedWindow: windowKey, fellBackFrom: null },
+    null,
+  ];
   if (!contract) {
     // Two distinct empty states:
     //   • lastSeen === null  ⇒ never indexed (truly unknown address)
