@@ -4,6 +4,7 @@ import { Inter_Tight, Instrument_Serif, JetBrains_Mono } from "next/font/google"
 import "./globals.css";
 import Analytics from "@/components/site/Analytics";
 import { rootGraph } from "@/lib/seo/schema";
+import { Umami } from "@/components/Umami";
 
 /**
  * Viewport export (Next.js 15+ pattern). Sets the mobile browser chrome
@@ -161,6 +162,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             because the gate killed our visibility into real usage and
             most visitors ignored the prompt anyway. */}
         <Analytics />
+        <Umami />
       </body>
     </html>
   );
