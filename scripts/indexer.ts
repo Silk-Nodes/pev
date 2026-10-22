@@ -102,6 +102,8 @@ async function startBoss(): Promise<PgBoss> {
 
 // ─── job submission ──────────────────────────────────────────────
 
+const LIVE_RETENTION_HOURS = 6;
+
 async function enqueue(
   boss: PgBoss,
   blockNumber: number,
@@ -117,8 +119,18 @@ async function enqueue(
   // backfill no longer starves the live tail, workers keep up with the
   // chain head and only chew through backfill in the leftover capacity.
   // (Learned the hard way at ~5K-block lag during the first big backfill.)
+  //
+  // NEWEST FIRST: live priority is the block number itself, so among live
+  // jobs the newest block is always taken next. When the workers are slower
+  // than the chain (the indexer runs under a tight CPU cap), the page keeps
+  // showing recent blocks and the gap opens behind it instead of in front.
+  // Oldest-first let a lag build up for days until the queue reached blocks
+  // the node had already pruned, and then nothing indexed at all (Oct 2026).
+  // Live jobs nobody reaches within LIVE_RETENTION_HOURS are dropped, which
+  // bounds the queue. priority is int4: block numbers fit for decades.
   await boss.send(TRACE_BLOCK_QUEUE, job, {
-    priority: mode === "live" ? 10 : 0,
+    priority: mode === "live" ? blockNumber : 0,
+    ...(mode === "live" ? { retentionHours: LIVE_RETENTION_HOURS } : {}),
     singletonKey: `block:${blockNumber}`,
     singletonHours: 1,
     retryLimit: 5,
