@@ -6,10 +6,10 @@
 -- thrash the disk. These settings give Postgres room to cache and to
 -- sort in memory.
 --
--- MUST be run as the postgres SUPERUSER on the DB host (10.42.44.182),
+-- MUST be run as the postgres SUPERUSER on the DB host (the host in DATABASE_URL, see .env),
 -- ALTER SYSTEM is superuser-only:
 --   sudo -u postgres psql -d pev -f db-tune-tier1.sql
---   (or: sudo -u postgres psql -f db-tune-tier1.sql  — ALTER SYSTEM is
+--   (or: sudo -u postgres psql -f db-tune-tier1.sql; ALTER SYSTEM is
 --    cluster-wide, the target db does not matter)
 --
 -- Most settings apply on `SELECT pg_reload_conf()` at the end (NO
