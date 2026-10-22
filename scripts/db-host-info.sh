@@ -8,10 +8,10 @@
 # in glances), so heavy analytical scans blow past the IOPS budget and
 # everything queues behind disk waits. This confirms or kills that.
 #
-# RUN THIS ON THE POSTGRES HOST (10.42.44.182), not the app VM:
+# RUN THIS ON THE POSTGRES HOST (the host in DATABASE_URL, see .env), not the app VM:
 #   bash db-host-info.sh
 #
-# If you cannot SSH to .182 directly, run it on whatever host the
+# If you cannot SSH to the DB host directly, run it on whatever host the
 # postgres process actually lives on. Everything here is read-only.
 
 echo "############ CPU ############"
