@@ -84,7 +84,9 @@ async function windowStart(): Promise<number> {
       if (parts.length) return parts[0].from;
     }
   }
-  return cutoffBlock(await cursor());
+  const c = await cutoffBlock();
+  if (c <= 0) throw new Error(`no indexed block in the last ${RETENTION_DAYS} days, refusing to pick a window`);
+  return c;
 }
 
 async function primaryKeyDef(table: string): Promise<string> {
@@ -110,7 +112,7 @@ async function secondaryIndexes(table: string): Promise<{ name: string; def: str
 async function plan(): Promise<void> {
   const head = await cursor();
   const start = await windowStart();
-  console.log(`retention window: ${RETENTION_DAYS} days = ${fmt(RETENTION_DAYS * BLOCKS_PER_DAY)} blocks`);
+  console.log(`retention window: ${RETENTION_DAYS} days, cut by block timestamp`);
   console.log(`newest indexed block: ${fmt(head)} · window starts at block ${fmt(start)}`);
   const db = await queryOne<{ s: string }>("SELECT pg_size_pretty(pg_database_size(current_database())) AS s");
   console.log(`database size: ${db?.s}`);

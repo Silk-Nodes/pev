@@ -32,10 +32,14 @@ function envInt(name: string, dflt: number): number {
 }
 
 export const RETENTION_DAYS = envInt("PEV_RETENTION_DAYS", 7);
-/** Monad produces a block every 0.4s. */
-export const BLOCKS_PER_DAY = 216_000;
-export const RETENTION_BLOCKS = RETENTION_DAYS * BLOCKS_PER_DAY;
-/** Width of one partition, in blocks. 250k is about 28 hours. */
+/**
+ * Upper estimate of blocks per day, used only to size scan ranges. Monad
+ * ran at 0.30s per block in Nov 2026 (about 285k a day) and the cadence
+ * moves, so the window itself is never derived from this number: the
+ * cutoff comes from block timestamps (see cutoffBlock).
+ */
+export const BLOCKS_PER_DAY = 300_000;
+/** Width of one partition, in blocks. 250k is about 21 hours at 0.30s. */
 export const PARTITION_BLOCKS = 250_000;
 /** How many partitions to keep ready ahead of the chain head. */
 const PARTITIONS_AHEAD = 3;
@@ -58,9 +62,18 @@ export function partitionName(table: string, from: number): string {
   return `${table}_p${from}`;
 }
 
-/** Lowest block the window still holds, given the newest indexed block. */
-export function cutoffBlock(head: number): number {
-  return Math.max(0, head - RETENTION_BLOCKS);
+/**
+ * Lowest block the window still holds: the first indexed block whose
+ * timestamp is inside the last RETENTION_DAYS. Returns 0 (keep
+ * everything) when no indexed block is that recent, so a stalled indexer
+ * never has its last data pruned out from under it.
+ */
+export async function cutoffBlock(): Promise<number> {
+  const row = await queryOne<{ n: string | null }>(
+    `SELECT min(number)::text AS n FROM blocks WHERE timestamp >= now() - make_interval(days => $1)`,
+    [RETENTION_DAYS],
+  );
+  return row?.n ? parseInt(row.n, 10) : 0;
 }
 
 export async function isPartitioned(table: string): Promise<boolean> {
@@ -240,14 +253,21 @@ export async function runRetention(): Promise<RetentionReport> {
   const head = cur ? parseInt(cur.b, 10) : 0;
   report.head = head;
   if (head <= 0) return report;
-  report.cutoff = cutoffBlock(head);
-
   report.active = await retentionActive();
-  if (!report.active) return report;
+  if (!report.active) {
+    report.cutoff = await cutoffBlock();
+    return report;
+  }
 
-  // Partitions first: a missing partition makes block writes fail.
+  // Partitions first, even when nothing gets pruned: a missing partition
+  // makes block writes fail.
   for (const t of PARTITIONED_TABLES) {
     report.created.push(...(await ensurePartitions(t, head, head)));
+  }
+  report.cutoff = await cutoffBlock();
+  if (report.cutoff <= 0) {
+    console.warn(`[retention] no indexed block in the last ${RETENTION_DAYS} days, pruning nothing`);
+    return report;
   }
   for (const t of PARTITIONED_TABLES) {
     report.dropped.push(...(await dropExpiredPartitions(t, report.cutoff)));
