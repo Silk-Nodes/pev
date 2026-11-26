@@ -536,6 +536,19 @@ export async function getCursor(): Promise<{
 }
 
 /**
+ * Oldest block still held. pev keeps a rolling window (see retention.ts),
+ * so anything below this has been pruned and cannot come back: the node
+ * no longer serves traces that old either. Cached for a minute.
+ */
+let _oldestBlock: { n: number | null; at: number } | null = null;
+export async function getOldestBlock(): Promise<number | null> {
+  if (_oldestBlock && Date.now() - _oldestBlock.at < 60_000) return _oldestBlock.n;
+  const row = await queryOne<{ n: string | null }>("SELECT min(number)::text AS n FROM blocks");
+  _oldestBlock = { n: row?.n ? parseInt(row.n, 10) : null, at: Date.now() };
+  return _oldestBlock.n;
+}
+
+/**
  * Recent indexed blocks, newest first. Used for the landing-page live feed
  * and the leaderboards.
  */
@@ -2970,19 +2983,20 @@ export async function refreshGrowthData(
     gas_used: string;
     gas_limit: string;
   }>(
-    `SELECT to_char(date_trunc('day', timestamp), 'YYYY-MM-DD') AS day,
-            count(*)::text              AS blocks,
-            sum(tx_count)::text         AS txs,
-            avg(parallelism_score)::text AS avg_score,
-            avg(execution_depth)::text  AS avg_waves,
-            sum(conflict_count)::text   AS conflicts,
-            sum(gas_used)::text         AS gas_used,
-            sum(gas_limit)::text        AS gas_limit
-       FROM blocks
-      WHERE number > $1
-      GROUP BY 1
+    `SELECT to_char(day, 'YYYY-MM-DD')       AS day,
+            blocks::text                     AS blocks,
+            txs::text                        AS txs,
+            avg_parallelism_score::text      AS avg_score,
+            avg_execution_depth::text        AS avg_waves,
+            conflicts::text                  AS conflicts,
+            gas_used::text                   AS gas_used,
+            gas_limit::text                  AS gas_limit
+       FROM daily_summary
+      WHERE day >= (now() AT TIME ZONE 'UTC')::date - $1::int
       ORDER BY 1`,
-    [fromBlock],
+    // daily_summary is the one table that outlives the retention window,
+    // so this series can run longer than the block data itself.
+    [windowDays],
   );
   const daily: GrowthDay[] = dayRows.map((r) => {
     const blocks = parseInt(r.blocks, 10);

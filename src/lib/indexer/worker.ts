@@ -45,7 +45,21 @@ export async function traceBlockJob(
   const t0 = performance.now();
   const probe = await probeBlock(job.blockNumber);
   const pev = probeToPEV(probe);
-  await writeBlock(probe, pev, ENGINE_VERSION);
+  try {
+    await writeBlock(probe, pev, ENGINE_VERSION);
+  } catch (err) {
+    // 23514 on a partitioned table = "no partition found for row": the
+    // block is older than the retention window. Retrying cannot help, so
+    // the job is finished here instead of being thrown back to the queue.
+    const e = err as { code?: string; message?: string };
+    if (e.code === "23514" && /no partition of relation/.test(e.message ?? "")) {
+      console.warn(
+        `[indexer] #${job.blockNumber} is outside the retention window, skipped`,
+      );
+      return { blockNumber: job.blockNumber, txCount: probe.txCount, conflictCount: probe.conflictCount, parallelismScore: pev.summary.parallelismScore, totalMs: Math.round(performance.now() - t0) };
+    }
+    throw err;
+  }
   const elapsed = Math.round(performance.now() - t0);
 
   console.log(

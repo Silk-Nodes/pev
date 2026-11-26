@@ -449,7 +449,7 @@ export default async function AnalyticsPage() {
             }}
           >
             The chain&rsquo;s workhorses, ranked by raw tx count over
-            all time pev has indexed. Compare to the contention leaderboard
+            the last 7 days, the window pev keeps. Compare to the contention leaderboard
             above:{" "}
             <em
               style={{

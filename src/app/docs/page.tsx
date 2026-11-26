@@ -396,7 +396,7 @@ export default function DocsPage() {
           'Read the verdict line at the top: Healthy, Bottlenecked, or Throughput-killer. That\'s pev\'s one-line take.',
           "Scroll to Hot Storage Slots. The top entry is the most contested location in your contract. If you can refactor that one slot, you'll move the score.",
           "Scroll to Methods Causing Conflicts. Groups conflicts by 4-byte selector so you can see which function (mint, swap, claim, etc.) is responsible for what share.",
-          "If you've made a change and want to compare, use the window selector at the top: 1h, 24h, 7d, 30d, all-time. Each window queries fresh.",
+          "If you've made a change and want to compare, use the window selector at the top: 1h, 24h, 7d. pev keeps the last 7 days of data, so 7d is the widest view. Each window queries fresh.",
         ]}
       />
 

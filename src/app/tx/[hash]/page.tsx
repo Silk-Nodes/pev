@@ -548,10 +548,10 @@ function NotIndexed({
           in {blockLabel}, but pev hasn&apos;t analyzed that block yet.
         </p>
         <p style={{ color: themeA.muted, lineHeight: 1.7 }}>
-          Most likely cause: the block is older than our indexing window
-          (we started on April 25, 2026) or just newer than the indexer
-          has reached this second. The latter usually resolves within
-          seconds, the former needs a backfill we haven&apos;t run yet.
+          pev keeps the last 7 days of Monad blocks. If this transaction
+          is older than that, its analysis is no longer stored. If it is
+          only seconds old, the indexer has not reached it yet and it
+          will appear shortly.
         </p>
       </>
     );
@@ -566,9 +566,9 @@ function NotIndexed({
           <span className="pev-mono" style={{ color: themeA.text }}>
             {shortHex(hash, 10, 8)}
           </span>{" "}
-          in our index. Either the block containing it isn&apos;t
-          covered by pev (outside our April 25, 2026 backfill window),
-          or the chain RPC wasn&apos;t reachable just now to confirm.
+          in our index. pev keeps the last 7 days of Monad blocks, so
+          the transaction may be older than that, or the chain RPC
+          wasn&apos;t reachable just now to confirm.
         </p>
       </>
     );
