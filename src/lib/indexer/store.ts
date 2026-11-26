@@ -750,7 +750,7 @@ export interface ContractDetail {
 
 /**
  * Time-range buckets exposed on /contract/[address]. Each maps to a
- * block count using the current Monad cadence (~0.5s/block ⇒ 7200 blocks/h).
+ * block count using SECONDS_PER_BLOCK (0.31s ⇒ 11,612 blocks/h).
  * `all` is a sentinel meaning "no block lower bound, use everything we
  * have indexed" and is implemented by skipping the `block_number >= $2`
  * predicate so the GIN index on contracts is the only filter.
@@ -759,7 +759,15 @@ export type ContractWindowKey = "1h" | "24h" | "7d" | "30d" | "all";
 
 export const DEFAULT_CONTRACT_WINDOW: ContractWindowKey = "7d";
 
-const BLOCKS_PER_HOUR = 7200;
+/**
+ * Monad block time, measured from daily_summary: 0.302s to 0.310s per block
+ * in Nov 2026. Rounded up to 0.31s so a window errs slightly SHORT of its
+ * label rather than past it. It was 0.5s until Nov 2026, which made the
+ * "7d" window cover about 4 days. Re-measure if the chain's cadence moves:
+ *   SELECT day, 86400.0 / (last_block - first_block + 1) FROM daily_summary ORDER BY day DESC;
+ */
+export const SECONDS_PER_BLOCK = 0.31;
+export const BLOCKS_PER_HOUR = Math.floor(3600 / SECONDS_PER_BLOCK);
 
 const WINDOW_BLOCK_COUNT: Record<ContractWindowKey, number | null> = {
   "1h": BLOCKS_PER_HOUR,
@@ -808,10 +816,10 @@ export async function getContractDetail(
   // contract, at every window, returned the empty state in a constant
   // ~9.6s. Small contracts that had always worked broke too.
   //
-  // So BLOCKS_PER_HOUR stays approximate on purpose. It errs SHORT of a
-  // true hour (Monad is near 302ms, this assumes 500ms), which means a
-  // window covers less wall-clock time than its label. That is a caveat
-  // the page can state. An extra query in the hot path that can fail is
+  // So BLOCKS_PER_HOUR stays approximate on purpose. SECONDS_PER_BLOCK is
+  // rounded up from the measured ~0.30s, so a window covers a little less
+  // wall-clock time than its label, never more. That is a caveat the page
+  // can state. An extra query in the hot path that can fail is
   // not a caveat, it is an outage.
   const ALL_WINDOW_BLOCKS = BLOCKS_PER_HOUR * 24 * 90;
   const blockCount = WINDOW_BLOCK_COUNT[windowKey] ?? ALL_WINDOW_BLOCKS;
@@ -871,7 +879,7 @@ export async function getContractDetail(
   // window and tries again.
   const TIMEOUT_BY_WINDOW: Record<ContractWindowKey, number> = {
     "1h": 2_500,
-    "24h": 4_000,
+    "24h": 7_000,
     "7d": 7_000,
     "30d": 9_000,
     all: 10_000,
@@ -882,8 +890,17 @@ export async function getContractDetail(
   // on a single client). Each carries its own statement_timeout so a
   // single slow query can't block the others, and any one timing out
   // surfaces as PG_QUERY_CANCELED which the page layer catches.
-  const [summaryRes, recentRes, hotSlotsRes, methodsRes] = await Promise.all([
-    runWithStatementTimeout<SummaryRow>(
+  // "Recent blocks" has two good plans and Postgres cannot tell which one
+  // fits from the query alone. For a busy contract, walking block_number
+  // backwards finds 10 matches almost at once. For a quiet one the same
+  // walk reads the whole window (about 1.2s warm and 4s cold over 7 days,
+  // Nov 2026) while the GIN index on contracts answers in milliseconds.
+  // The summary query already counts the contract's txs via GIN, so it
+  // runs first and its count picks the plan. GROUP BY + ORDER BY max()
+  // has no index order to follow, which steers the planner onto GIN.
+  const RECENT_VIA_GIN_MAX_TXS = 20_000;
+  const summaryThenRecent = (async () => {
+    const summaryRes = await runWithStatementTimeout<SummaryRow>(
       stmtTimeout,
       `SELECT
          count(DISTINCT t.block_number)::text   AS blocks,
@@ -892,27 +909,42 @@ export async function getContractDetail(
          sum(t.outbound_conflicts)::text         AS conflicts_caused
        FROM tx_executions t
        JOIN blocks b ON b.number = t.block_number
-       WHERE $1 = ANY(t.contracts)
+       WHERE t.contracts @> ARRAY[$1::bytea]
          ${blockClause}`,
       params,
-    ),
-    runWithStatementTimeout<RecentRow>(
+    );
+    const txs = parseInt(summaryRes.rows[0]?.txs ?? "0", 10);
+    if (txs === 0) return { summaryRes, recentRes: { rows: [] as RecentRow[] } };
+    const recentBlocksSql =
+      txs <= RECENT_VIA_GIN_MAX_TXS
+        ? `SELECT block_number
+             FROM tx_executions
+            WHERE contracts @> ARRAY[$1::bytea]
+              ${blockClauseNoAlias}
+            GROUP BY block_number
+            ORDER BY max(block_number) DESC
+            LIMIT 10`
+        : `SELECT DISTINCT block_number
+             FROM tx_executions
+            WHERE contracts @> ARRAY[$1::bytea]
+              ${blockClauseNoAlias}
+            ORDER BY block_number DESC
+            LIMIT 10`;
+    const recentRes = await runWithStatementTimeout<RecentRow>(
       stmtTimeout,
       `SELECT b.number::text, b.hash, b.timestamp, b.tx_count,
               b.parallelism_score, b.blocked_pct, b.conflict_count,
               b.execution_depth
          FROM blocks b
-         JOIN (
-           SELECT DISTINCT block_number
-             FROM tx_executions
-            WHERE $1 = ANY(contracts)
-              ${blockClauseNoAlias}
-            ORDER BY block_number DESC
-            LIMIT 10
-         ) recent_blocks ON recent_blocks.block_number = b.number
+         JOIN (${recentBlocksSql}) recent_blocks ON recent_blocks.block_number = b.number
         ORDER BY b.number DESC`,
       params,
-    ),
+    );
+    return { summaryRes, recentRes };
+  })();
+
+  const [{ summaryRes, recentRes }, hotSlotsRes, methodsRes] = await Promise.all([
+    summaryThenRecent,
     runWithStatementTimeout<HotSlotRow>(
       stmtTimeout,
       `SELECT slot,
@@ -939,7 +971,7 @@ export async function getContractDetail(
               sum(outbound_conflicts)::text        AS conflicts_caused,
               count(DISTINCT block_number)::text   AS blocks_seen
          FROM tx_executions
-        WHERE $1 = ANY(contracts)
+        WHERE contracts @> ARRAY[$1::bytea]
           AND method_selector IS NOT NULL
           ${blockClauseNoAlias}
         GROUP BY method_selector
@@ -1568,13 +1600,10 @@ export async function getAnalyticsData(
     block_count: string;
   }
 
-  // Block count cap on the standout query. 24h on Monad mainnet at
-  // ~0.5s block time is ~172,800 blocks. We bound the scan by block
-  // number (last 200K blocks) instead of timestamp so the query uses
-  // the PK index range scan directly. Slightly wider than 24h, but
-  // it's also faster and the worst/best within that window are still
-  // representative of "today".
-  const standoutFromBlock = Math.max(0, windowToBlock - 200_000);
+  // Block count cap on the standout query: the last 24h of blocks, bound
+  // by block number instead of timestamp so the query uses the PK index
+  // range scan directly.
+  const standoutFromBlock = Math.max(0, windowToBlock - BLOCKS_PER_HOUR * 24);
 
   // "Freshly deployed" cutoff. Same 7d window as the main aggregates.
   // contract_index doesn't have a deploy_block exactly, but first_block
@@ -1804,10 +1833,9 @@ export async function getAnalyticsData(
     else if (r.kind === "worst") worst = block;
   }
 
-  // Freshly-deployed: compute age from block-number delta. Monad
-  // averages ~0.5s per block, so (windowToBlock - firstBlock) * 0.5
-  // is a good age estimate without an extra JOIN.
-  const MONAD_AVG_BLOCK_SECONDS = 0.5;
+  // Freshly-deployed: compute age from block-number delta times the
+  // block time, a good age estimate without an extra JOIN.
+  const MONAD_AVG_BLOCK_SECONDS = SECONDS_PER_BLOCK;
   const freshlyDeployed: AnalyticsRecentContract[] = recentContractRows.map(
     (r) => {
       const firstBlock = parseInt(r.first_block, 10);

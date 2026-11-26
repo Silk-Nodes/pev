@@ -9,6 +9,7 @@ import {
   type ContractDetail,
   type ContractMethod,
   type ContractWindowKey,
+  SECONDS_PER_BLOCK,
 } from "@/lib/indexer/store";
 import { PG_QUERY_CANCELED } from "@/lib/db";
 import { breadcrumbSchema } from "@/lib/seo/schema";
@@ -154,9 +155,12 @@ const FALLBACK_TOTAL_BUDGET_MS = 26_000;
 // 30d and all share a budget because for our ~7-day-old index they
 // touch the same data. If indexer history grows past 30 days we'll
 // want to give `all` more room or pre-aggregate.
+// 24h gets 7s: since the window counts blocks at the real 0.31s cadence
+// it spans a true day, and the busiest contracts (1M+ txs a day) take
+// 5-6s there. Worst case is now 6s (7d) + 7s (24h) + 4s (1h) = 17s.
 const PER_RUNG_TIMEOUT_MS: Record<ContractWindowKey, number> = {
   "1h": 4_000,
-  "24h": 5_000,
+  "24h": 7_000,
   "7d": 6_000,
   "30d": 6_000,
   all: 6_000,
@@ -752,8 +756,7 @@ function WindowDisclosure({
 }) {
   const isAllTime = contract.windowKey === "all";
   const blockSpan = contract.windowToBlock - contract.windowFromBlock;
-  // ~0.5s/block on Monad mainnet, current cadence. Update if it shifts.
-  const minutes = (blockSpan * 0.5) / 60;
+  const minutes = (blockSpan * SECONDS_PER_BLOCK) / 60;
   const durationLabel = isAllTime
     ? "all indexed history"
     : minutes < 60
