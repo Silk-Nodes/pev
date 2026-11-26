@@ -34,6 +34,7 @@
 
 import { NextResponse } from "next/server";
 import { queryOne } from "@/lib/db";
+import { BLOCKS_PER_HOUR } from "@/lib/indexer/store";
 
 export const dynamic = "force-dynamic";
 
@@ -101,8 +102,8 @@ export async function GET(_req: Request, ctx: RouteContext) {
     timedOut = true;
   }
 
-  // Compute window membership from last_block + tip. ~0.5s/block on Monad.
-  const blocksPerHour = 7_200;
+  // Compute window membership from last_block + tip.
+  const blocksPerHour = BLOCKS_PER_HOUR;
   const inWindow1h =
     lastBlock !== null && tipNumber > 0
       ? lastBlock >= tipNumber - blocksPerHour
