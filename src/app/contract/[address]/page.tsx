@@ -41,7 +41,10 @@ interface PageParams {
   searchParams: Promise<{ window?: string }>;
 }
 
-const VALID_WINDOWS: ContractWindowKey[] = ["1h", "24h", "7d", "30d", "all"];
+// pev keeps a rolling 7 days of block data (src/lib/indexer/retention.ts),
+// so 7d is the widest window there is. Old ?window=30d and ?window=all links
+// fall back to the default.
+const VALID_WINDOWS: ContractWindowKey[] = ["1h", "24h", "7d"];
 
 const WINDOW_LABEL: Record<ContractWindowKey, string> = {
   "1h": "1h",
@@ -74,7 +77,7 @@ function urlForWindow(addr: string, w: ContractWindowKey): string {
  * at "1h" because anything below that should never time out, and if it
  * does, something else is wrong.
  */
-const WINDOW_LADDER: ContractWindowKey[] = ["1h", "24h", "7d", "30d", "all"];
+const WINDOW_LADDER: ContractWindowKey[] = ["1h", "24h", "7d"];
 
 function narrowerWindow(w: ContractWindowKey): ContractWindowKey | null {
   const i = WINDOW_LADDER.indexOf(w);
@@ -522,9 +525,8 @@ export default async function ContractPage({ params, searchParams }: PageParams)
 
       {/* Window selector + disclosure band. The pills let the reader
           retarget the aggregates over different time horizons (1h, 24h,
-          7d, 30d, all-time). The disclosure shows the actual block range
-          backing the current numbers, so they're never confused with
-          all-time history when they're not. */}
+          7d). The disclosure shows the actual block range backing the
+          current numbers. */}
       <WindowDisclosure
         addr={contract.address}
         contract={contract}
@@ -695,9 +697,8 @@ export default async function ContractPage({ params, searchParams }: PageParams)
         <span className="pev-eyebrow">Caveat</span>
         <br />
         Stats are aggregated over the time window selected at the top of
-        the page. The default is the last 7 days; switch to "All time" to
-        cover every block pev has indexed, or narrow to 1h / 24h to see
-        only recent behavior. The "avg parallelism" is the average score
+        the page. The default is the last 7 days, which is everything pev
+        keeps; narrow to 1h / 24h to see only recent behavior. The "avg parallelism" is the average score
         of every block this contract appeared in within that window (not
         a per-tx measurement). The contract name is shown when verified
         on Sourcify (rare on Monad mainnet right now); otherwise we show
@@ -832,7 +833,7 @@ function WindowDisclosure({
             {WINDOW_LABEL[contract.windowKey]}
           </span>
           . This is the widest window we can serve fast for this contract
-          right now. A pre-aggregated all-time view is on the roadmap.
+          right now.
         </div>
       )}
 
@@ -1094,14 +1095,14 @@ function NotSeen({
             </Link>
             {" "}, about <span style={{ color: themeA.text }}>{ageLabel} ago</span>.
           </p>
-          {windowKey !== "all" && (
+          {windowKey !== "7d" && (
             <p style={{ marginTop: 22 }}>
               <Link
-                href={urlForWindow(addr, "all")}
+                href={urlForWindow(addr, "7d")}
                 className="pev-link"
                 style={{ fontWeight: 500 }}
               >
-                → broaden to All time
+                → broaden to 7 days
               </Link>
               <span style={{ color: themeA.subtle, marginLeft: 12 }}>
                 or jump to that block

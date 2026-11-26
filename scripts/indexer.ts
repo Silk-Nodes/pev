@@ -36,6 +36,7 @@
 import PgBoss from "pg-boss";
 import { closePool, query } from "../src/lib/db";
 import { startWatcher, type BlockHead } from "../src/lib/indexer/watcher";
+import { startRetentionLoop } from "../src/lib/indexer/retention";
 import {
   traceBlockJob,
   TRACE_BLOCK_QUEUE,
@@ -299,6 +300,9 @@ async function main(): Promise<void> {
   };
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
+
+  // Keeps partitions ahead of the head and drops what has left the window.
+  startRetentionLoop(abort.signal);
 
   if (isBackfill) {
     await runBackfill(boss, abort);

@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { probeBlock } from "@/lib/parallel-probe";
 import { probeToPEV } from "@/lib/probe-to-pev";
 import { enrichPEVData } from "@/lib/enrich-pev";
-import { getBlockPEV } from "@/lib/indexer/store";
+import { getBlockPEV, getOldestBlock } from "@/lib/indexer/store";
 import { resolveContract } from "@/lib/enrichment";
 import EditorialView from "@/components/parallel/EditorialView";
 import { breadcrumbSchema } from "@/lib/seo/schema";
@@ -159,6 +159,17 @@ export default async function BlockPage({ params }: PageParams) {
     // DB hiccup, fall through to live trace. Don't block the user on
     // a transient Postgres issue.
     console.warn(`[block-page] db read failed for #${n}:`, (err as Error).message);
+  }
+
+  // Older than the retention window: the analysis has been pruned and
+  // the node no longer serves traces that old, so a live trace would only
+  // fail slowly. not-found.tsx in this folder explains the window.
+  try {
+    const oldest = await getOldestBlock();
+    if (oldest !== null && n < oldest) notFound();
+  } catch (err) {
+    if ((err as { digest?: string }).digest?.startsWith("NEXT_")) throw err;
+    console.warn(`[block-page] window check failed for #${n}:`, (err as Error).message);
   }
 
   // ─── 2. Fall back to live trace (slow path: 200ms-1.5s) ──────
